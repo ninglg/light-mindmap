@@ -1,0 +1,418 @@
+/* ============================================================
+   Light MindMap — styles
+   ------------------------------------------------------------
+   Overlay anchored inside MarkdownView.contentEl. The view's
+   content container is normally positioned, so inset:0 covers
+   both source and reading panes.
+   ============================================================ */
+
+.workspace-leaf-content[data-type="markdown"] .view-content {
+  position: relative;
+}
+
+/* Hide the underlying source/reading panes when overlay is visible so
+   theme-provided translucency can never leak source text through. */
+.workspace-leaf-content[data-type="markdown"] .view-content:has(> .lmm-overlay:not(.lmm-hidden)) > .markdown-source-view,
+.workspace-leaf-content[data-type="markdown"] .view-content:has(> .lmm-overlay:not(.lmm-hidden)) > .markdown-reading-view {
+  visibility: hidden;
+}
+
+.lmm-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #ffffff;
+  background-color: var(--lmm-theme-bg, var(--background-primary));
+  background-image:
+    radial-gradient(1200px 600px at 15% 0%, var(--lmm-theme-tint-1, rgba(99, 102, 241, 0.08)), transparent 60%),
+    radial-gradient(900px 500px at 100% 100%, var(--lmm-theme-tint-2, rgba(236, 72, 153, 0.08)), transparent 60%);
+  font-family: var(--font-interface);
+  color: var(--lmm-theme-fg, var(--text-normal));
+  isolation: isolate;
+}
+
+.theme-dark .lmm-overlay {
+  background-color: #1e1e1e;
+  background-color: var(--lmm-theme-bg, var(--background-primary));
+}
+
+.lmm-overlay.lmm-hidden {
+  display: none;
+}
+
+/* ---------- Toolbar ---------- */
+
+.lmm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  align-items: center;
+  flex-shrink: 0;
+  backdrop-filter: blur(6px);
+}
+
+.lmm-toolbar-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.lmm-toolbar-group + .lmm-toolbar-group:not(.lmm-toolbar-right) {
+  border-left: 1px solid var(--background-modifier-border);
+  padding-left: 10px;
+}
+
+.lmm-toolbar-right {
+  margin-left: auto;
+}
+
+.lmm-toolbar-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-right: 4px;
+  font-weight: 600;
+}
+
+.lmm-btn {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.lmm-btn:hover {
+  background: var(--background-modifier-hover);
+  transform: translateY(-1px);
+}
+
+.lmm-btn:active {
+  transform: translateY(0);
+}
+
+.lmm-btn-active {
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.35);
+}
+
+.lmm-btn-active:hover {
+  background: linear-gradient(135deg, #5b5cf0, #7c4cf0);
+  color: #fff;
+}
+
+.lmm-btn-ghost {
+  background: transparent;
+}
+
+.lmm-select {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.lmm-select:focus {
+  outline: 2px solid var(--lmm-theme-root-accent, #6366F1);
+  outline-offset: 1px;
+}
+
+/* ---------- Canvas ---------- */
+
+.lmm-canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  background-color: var(--lmm-theme-bg, var(--background-primary));
+}
+
+.lmm-canvas.lmm-dragging {
+  cursor: grabbing;
+}
+
+.lmm-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.lmm-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.lmm-conn {
+  opacity: 0.9;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.10));
+  transition: opacity 0.15s ease, stroke-width 0.15s ease;
+}
+
+.lmm-nodes {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Nodes ---------- */
+
+.lmm-node {
+  position: absolute;
+  padding: 8px 14px;
+  background: var(--lmm-theme-bg, var(--background-primary));
+  color: var(--lmm-theme-fg, var(--text-normal));
+  border: 2px solid var(--lmm-color, #6366F1);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.lmm-node:hover {
+  transform: scale(1.04);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+  z-index: 5;
+  filter: brightness(1.05);
+}
+
+.lmm-node:focus {
+  outline: none;
+}
+
+/* Selection ring (focused node, not editing) */
+.lmm-node.lmm-selected {
+  outline: 2px dashed var(--lmm-color, #6366F1);
+  outline-offset: 4px;
+  z-index: 6;
+}
+
+.lmm-node.lmm-selected.lmm-node-root {
+  outline-color: var(--lmm-theme-root-accent, #8B5CF6);
+}
+
+/* Edit mode — caret visible, text wraps, no ellipsis truncation */
+.lmm-node.lmm-editing {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  outline: 2px solid #6366F1;
+  outline-offset: 3px;
+  z-index: 8;
+  min-width: 80px;
+  caret-color: currentColor;
+  transform: none !important;
+}
+
+.lmm-node.lmm-editing.lmm-node-root,
+.lmm-node.lmm-editing.lmm-node-d1 {
+  caret-color: #fff;
+}
+
+/* Root: bold gradient capsule with glow */
+.lmm-node-root,
+.lmm-node-d0 {
+  background: var(--lmm-theme-root-grad, linear-gradient(135deg, #6366F1, #8B5CF6 60%, #EC4899));
+  color: #fff;
+  border: none;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 14px 26px;
+  border-radius: 18px;
+  box-shadow:
+    0 8px 28px rgba(99, 102, 241, 0.42),
+    0 2px 6px rgba(139, 92, 246, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.3px;
+}
+
+/* Level 1: solid colored pill, white text */
+.lmm-node-d1 {
+  background: var(--lmm-color);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  box-shadow:
+    0 5px 16px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* Level 2: tinted soft fill with branch-color border */
+.lmm-node-d2 {
+  background: color-mix(in srgb, var(--lmm-color) 16%, var(--lmm-theme-bg, var(--background-primary)));
+  border-color: var(--lmm-color);
+  border-width: 2px;
+  color: var(--lmm-theme-fg, var(--text-normal));
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 7px 14px;
+}
+
+/* Level 3+: lighter card with thin colored border */
+.lmm-node-d3,
+.lmm-node-d4,
+.lmm-node-d5,
+.lmm-node-d6 {
+  background: var(--lmm-theme-bg, var(--background-primary));
+  border-color: var(--lmm-color);
+  border-width: 1.5px;
+  font-weight: 500;
+  font-size: 12.5px;
+  padding: 6px 12px;
+  color: var(--lmm-theme-fg, var(--text-normal));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Theme-dark refinements */
+.theme-dark .lmm-node {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+.theme-dark .lmm-node-d2 {
+  background: color-mix(in srgb, var(--lmm-color) 22%, var(--lmm-theme-bg, var(--background-primary)));
+}
+
+/* Midnight theme always uses dark-style mixing regardless of obsidian theme */
+.lmm-overlay.lmm-theme-midnight .lmm-node-d2 {
+  background: color-mix(in srgb, var(--lmm-color) 22%, var(--lmm-theme-bg));
+}
+.lmm-overlay.lmm-theme-midnight .lmm-node {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* Virtual root (used when multiple top-level headings) */
+.lmm-node-virtual {
+  background: linear-gradient(135deg, #475569, #1F2937) !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.35) !important;
+}
+
+/* ---------- Node shape variants (mindmap-node) ---------- */
+
+/* Square: straight corners on all node levels */
+.lmm-overlay.lmm-node-style-square .lmm-node,
+.lmm-overlay.lmm-node-style-square .lmm-node-root,
+.lmm-overlay.lmm-node-style-square .lmm-node-d0,
+.lmm-overlay.lmm-node-style-square .lmm-node-d1 {
+  border-radius: 0;
+}
+
+/* Borderless: drop outlines, lean on background/shadow for separation */
+.lmm-overlay.lmm-node-style-borderless .lmm-node {
+  border-color: transparent;
+  border-width: 0;
+  padding: 6px 12px;
+}
+.lmm-overlay.lmm-node-style-borderless .lmm-node-d2 {
+  background: transparent;
+}
+.lmm-overlay.lmm-node-style-borderless .lmm-node-d3,
+.lmm-overlay.lmm-node-style-borderless .lmm-node-d4,
+.lmm-overlay.lmm-node-style-borderless .lmm-node-d5,
+.lmm-overlay.lmm-node-style-borderless .lmm-node-d6 {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Pill: fully rounded capsule */
+.lmm-overlay.lmm-node-style-circle .lmm-node,
+.lmm-overlay.lmm-node-style-circle .lmm-node-root,
+.lmm-overlay.lmm-node-style-circle .lmm-node-d0,
+.lmm-overlay.lmm-node-style-circle .lmm-node-d1 {
+  border-radius: 999px;
+}
+
+/* ---------- Empty state ---------- */
+
+.lmm-empty {
+  margin: auto;
+  padding: 60px 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.lmm-empty-icon {
+  font-size: 56px;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.35));
+}
+
+.lmm-empty code {
+  background: var(--background-secondary);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+
+/* ---------- Restore FAB (shown when overlay is hidden) ---------- */
+
+.lmm-fab {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  z-index: 30;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6 60%, #EC4899);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow:
+    0 8px 24px rgba(99, 102, 241, 0.42),
+    0 2px 6px rgba(139, 92, 246, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.lmm-fab:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 12px 30px rgba(99, 102, 241, 0.5),
+    0 3px 8px rgba(139, 92, 246, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lmm-fab:active {
+  transform: translateY(0);
+}
