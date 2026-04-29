@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "minAppVersion": "1.4.0",
   "description": "Auto-render markdown headings as a colorful mind map on files with frontmatter `type: mindmap`. Per-file layout (balanced / right / left), theme (6 palettes), connection line (smooth / straight / right-angle, solid or dashed), and node shape (rounded / square / borderless / pill) — all persisted to frontmatter (`mindmap-layout`, `mindmap-theme`, `mindmap-line`, `mindmap-node`) and restored on reopen.",
-  "author": "ninglg",
+  "author": "Light Ning",
   "authorUrl": "https://github.com/ninglg/obsidian-light-mindmap",
   "isDesktopOnly": false
 }
