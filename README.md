@@ -14,13 +14,18 @@ Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/re
 type: mindmap
 ---
 
-# Project Alpha
-## Goals
-### Milestone 1
-### Milestone 2
-## Team
-### Engineering
-### Design
+# My Plan
+## Life
+### go to school
+## Work
+### do some paper job
+### do some meeting
+## Study
+### read book
+### watch movie
+## Shopping
+### buy flowers
+### buy candy
 ```
 
 The mind map updates in real time as you edit the source.
