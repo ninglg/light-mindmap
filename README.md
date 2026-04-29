@@ -1,7 +1,7 @@
-# Light MindMap
+# Light Mindmap
+Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.
 
-An Obsidian plugin that auto-renders markdown headings as a colorful, interactive mind map — no extra syntax required.
-
+## Preview
 ![Light MindMap Preview 1](screenshot1.png)
 ![Light MindMap Preview 2](screenshot2.png)
 

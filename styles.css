@@ -1,11 +1,3 @@
-/* ============================================================
-   Light MindMap — styles
-   ------------------------------------------------------------
-   Overlay anchored inside MarkdownView.contentEl. The view's
-   content container is normally positioned, so inset:0 covers
-   both source and reading panes.
-   ============================================================ */
-
 .workspace-leaf-content[data-type="markdown"] .view-content {
   position: relative;
 }
