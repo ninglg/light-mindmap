@@ -2,6 +2,9 @@
 
 An Obsidian plugin that auto-renders markdown headings as a colorful, interactive mind map — no extra syntax required.
 
+![Light MindMap Preview 1](screenshot1.png)
+![Light MindMap Preview 2](screenshot2.png)
+
 ## How It Works
 
 Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/reading view with a live mind map built from the note's heading hierarchy.
@@ -35,45 +38,45 @@ The mind map updates in real time as you edit the source.
 
 Three layout modes, switchable from the toolbar or via command:
 
-| Layout | Description |
-|--------|-------------|
+| Layout       | Description                                                                    |
+| ------------ | ------------------------------------------------------------------------------ |
 | **Balanced** | Children are distributed to both sides of the root, weighted by subtree height |
-| **Right** | All branches expand to the right |
-| **Left** | All branches expand to the left |
+| **Right**    | All branches expand to the right                                               |
+| **Left**     | All branches expand to the left                                                |
 
 ### Themes
 
 Six built-in color palettes:
 
-| Theme | Style |
-|-------|-------|
-| **Vibrant** | Indigo/violet/pink gradient — the default |
-| **Classic** | Earth tones on a warm cream background |
-| **Fresh** | Greens and teals on a light mint background |
-| **Ocean** | Blues and indigos on a pale blue background |
-| **Sunset** | Reds, oranges, and pinks on a warm background |
-| **Midnight** | Neon accents on a dark slate background |
+| Theme        | Style                                         |
+| ------------ | --------------------------------------------- |
+| **Vibrant**  | Indigo/violet/pink gradient — the default     |
+| **Classic**  | Earth tones on a warm cream background        |
+| **Fresh**    | Greens and teals on a light mint background   |
+| **Ocean**    | Blues and indigos on a pale blue background   |
+| **Sunset**   | Reds, oranges, and pinks on a warm background |
+| **Midnight** | Neon accents on a dark slate background       |
 
 Themes adapt automatically to Obsidian's dark/light mode.
 
 ### Connection Line Styles
 
-| Style | Shape | Dash |
-|-------|-------|------|
-| **Smooth** | Cubic Bézier curve | Solid |
-| **Smooth Dashed** | Cubic Bézier curve | Dashed |
-| **Straight** | Direct line | Solid |
-| **Right Angle** | Horizontal + vertical segments | Solid |
+| Style                  | Shape                          | Dash   |
+| ---------------------- | ------------------------------ | ------ |
+| **Smooth**             | Cubic Bézier curve             | Solid  |
+| **Smooth Dashed**      | Cubic Bézier curve             | Dashed |
+| **Straight**           | Direct line                    | Solid  |
+| **Right Angle**        | Horizontal + vertical segments | Solid  |
 | **Right Angle Dashed** | Horizontal + vertical segments | Dashed |
 
 ### Node Shapes
 
-| Shape | Appearance |
-|-------|------------|
-| **Rounded** | Rounded rectangle (default) |
-| **Square** | Sharp corners |
+| Shape          | Appearance                            |
+| -------------- | ------------------------------------- |
+| **Rounded**    | Rounded rectangle (default)           |
+| **Square**     | Sharp corners                         |
 | **Borderless** | No border or background on leaf nodes |
-| **Pill** | Fully rounded capsule |
+| **Pill**       | Fully rounded capsule                 |
 
 ### Pan & Zoom
 
@@ -86,16 +89,16 @@ Themes adapt automatically to Obsidian's dark/light mode.
 
 Nodes can be edited directly on the canvas — changes are written back to the markdown file:
 
-| Action | Gesture / Key |
-|--------|--------------|
-| Select node | Click |
-| Edit node text | Double-click or **F2** |
-| Confirm edit + add sibling | **Enter** |
-| Confirm edit + add child | **Tab** |
-| Cancel edit | **Escape** |
-| Add sibling (without editing) | Select node, press **Enter** |
-| Add child (without editing) | Select node, press **Tab** |
-| Delete node | Select node, press **Delete** or **Backspace** |
+| Action                        | Gesture / Key                                  |
+| ----------------------------- | ---------------------------------------------- |
+| Select node                   | Click                                          |
+| Edit node text                | Double-click or **F2**                         |
+| Confirm edit + add sibling    | **Enter**                                      |
+| Confirm edit + add child      | **Tab**                                        |
+| Cancel edit                   | **Escape**                                     |
+| Add sibling (without editing) | Select node, press **Enter**                   |
+| Add child (without editing)   | Select node, press **Tab**                     |
+| Delete node                   | Select node, press **Delete** or **Backspace** |
 
 The root node cannot be deleted.
 
@@ -103,12 +106,12 @@ The root node cannot be deleted.
 
 All per-file display preferences are written to frontmatter and restored on next open:
 
-| Frontmatter key | Values |
-|----------------|--------|
-| `mindmap-layout` | `balanced` / `right` / `left` |
-| `mindmap-theme` | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight` |
-| `mindmap-line` | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed` |
-| `mindmap-node` | `rounded` / `square` / `borderless` / `circle` |
+| Frontmatter key  | Values                                                                 |
+| ---------------- | ---------------------------------------------------------------------- |
+| `mindmap-layout` | `balanced` / `right` / `left`                                          |
+| `mindmap-theme`  | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight`      |
+| `mindmap-line`   | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed` |
+| `mindmap-node`   | `rounded` / `square` / `borderless` / `circle`                         |
 
 ### Toggle Source View
 
@@ -118,11 +121,11 @@ All per-file display preferences are written to frontmatter and restored on next
 
 ## Installation
 
-~~### From Obsidian Community Plugins (recommended)~~
+### From Obsidian Community Plugins (recommended)
 
-~~1. Open **Settings → Community plugins → Browse**~~
-~~2. Search for **Light MindMap**~~
-~~3. Click **Install**, then **Enable**~~
+1. Open **Settings → Community plugins → Browse**
+2. Search for **Light MindMap**
+3. Click **Install**, then **Enable**
 
 ### Manual
 

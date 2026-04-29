@@ -78,7 +78,7 @@ const HGAP = 64;
 const VGAP = 18;
 const ROOT_HGAP = 90;
 const PAD = 60;
-const PLACEHOLDER = '新标题';
+const PLACEHOLDER = 'New Title';
 
 class LightMindMapPlugin extends obsidian.Plugin {
   async onload() {
