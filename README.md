@@ -129,7 +129,7 @@ All per-file display preferences are written to frontmatter and restored on next
 ### From Obsidian Community Plugins (recommended)
 
 1. Open **Settings → Community plugins → Browse**
-2. Search for **Light MindMap**
+2. Search for **Light Mindmap**
 3. Click **Install**, then **Enable**
 
 ### Manual
