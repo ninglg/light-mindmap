@@ -7,7 +7,7 @@ const THEMES = {
     name: 'Vibrant',
     palette: ['#F87171', '#FB923C', '#FBBF24', '#A3E635', '#34D399', '#22D3EE', '#60A5FA', '#A78BFA', '#F472B6', '#F43F5E', '#10B981', '#0EA5E9'],
     rootGrad: 'linear-gradient(135deg, #6366F1, #8B5CF6 60%, #EC4899)',
-    bg: null, fg: null,
+    bg: '#FFFFFF', fg: '#1F2937',
     tint1: 'rgba(99,102,241,0.08)', tint2: 'rgba(236,72,153,0.08)',
     rootAccent: '#8B5CF6'
   },
@@ -69,7 +69,8 @@ const NODE_STYLES = {
   rounded: { name: 'Rounded' },
   square: { name: 'Square' },
   borderless: { name: 'Borderless' },
-  circle: { name: 'Pill' }
+  circle: { name: 'Pill' },
+  doodle: { name: 'Doodle' }
 };
 
 const DEFAULT_NODE_STYLE = 'rounded';
@@ -126,6 +127,9 @@ class LightMindMapPlugin extends obsidian.Plugin {
     });
 
     this.app.workspace.onLayoutReady(() => this._doScan());
+
+    // Inject SVG filter for doodle node style
+    this._injectDoodleFilter();
   }
 
   onunload() {
@@ -364,7 +368,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (!view || !view.contentEl) return;
     let fab = view.contentEl.querySelector(':scope > .lmm-fab');
     if (fab) return;
-    fab = view.contentEl.createEl('button', { cls: 'lmm-fab', text: '🧠 Show Mindmap' });
+    fab = view.contentEl.createEl('button', { cls: 'lmm-fab', text: 'Show Mindmap' });
     fab.onclick = () => {
       overlay.classList.remove('lmm-hidden');
       fab.remove();
@@ -549,6 +553,8 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const resetBtn = zoomGroup.createEl('button', { cls: 'lmm-btn', text: '1:1' });
 
     const right = toolbar.createDiv({ cls: 'lmm-toolbar-group lmm-toolbar-right' });
+    const exportBtn = right.createEl('button', { cls: 'lmm-btn', text: 'Export PNG' });
+    exportBtn.onclick = () => this._exportPNG(overlay);
     const editBtn = right.createEl('button', { cls: 'lmm-btn lmm-btn-ghost', text: 'Edit Source' });
     editBtn.onclick = () => {
       overlay.classList.add('lmm-hidden');
@@ -1190,6 +1196,390 @@ class LightMindMapPlugin extends obsidian.Plugin {
     canvas._lmm = { tx: 0, ty: 0, scale: 1 };
     this._applyTransform(inner, canvas._lmm);
   }
+
+  // ────────────────────────────────────────────────────────────────
+  // PNG Export helpers
+  // ────────────────────────────────────────────────────────────────
+
+  _hexToRgb(hex) {
+    const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (!m) return [0, 0, 0];
+    return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+  }
+
+  _injectDoodleFilter() {
+    if (document.getElementById('lmm-doodle-filter')) return;
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', '0');
+    svg.setAttribute('height', '0');
+    svg.style.position = 'absolute';
+    svg.style.pointerEvents = 'none';
+    svg.innerHTML = `
+      <defs>
+        <filter id="doodle-filter" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="3" result="turbulence" seed="2"/>
+          <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="2" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+    `;
+    document.body.appendChild(svg);
+  }
+
+  _isDarkColor(hex) {
+    const [r, g, b] = this._hexToRgb(hex);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
+  }
+
+  _mixColors(hex1, hex2, weight) {
+    const [r1, g1, b1] = this._hexToRgb(hex1);
+    const [r2, g2, b2] = this._hexToRgb(hex2);
+    const r = Math.round(r1 + (r2 - r1) * weight);
+    const g = Math.round(g1 + (g2 - g1) * weight);
+    const b = Math.round(b1 + (b2 - b1) * weight);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  _roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  _drawTextToCanvas(ctx, text, x, y, maxW, font, color, align) {
+    ctx.save();
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textAlign = align || 'left';
+    ctx.textBaseline = 'middle';
+
+    let displayText = text;
+    let metrics = ctx.measureText(displayText);
+    if (metrics.width > maxW) {
+      while (displayText.length > 0 && ctx.measureText(displayText + '...').width > maxW) {
+        displayText = displayText.slice(0, -1);
+      }
+      displayText += '...';
+    }
+    ctx.fillText(displayText, x, y);
+    ctx.restore();
+  }
+
+  _drawNodeToCanvas(ctx, node, theme, nodeStyle, scale) {
+    const x = node.x * scale;
+    const y = node.y * scale;
+    const w = node.width * scale;
+    const h = node.height * scale;
+    const r = 8 * scale;
+    const depth = node.depth;
+    const bgColor = theme.bg || '#FFFFFF';
+    const isDark = this._isDarkColor(bgColor);
+
+    ctx.save();
+
+    // Draw this node
+    this._drawSingleNodeToCanvas(ctx, node, x, y, w, h, r, depth, bgColor, isDark, theme, nodeStyle, scale);
+
+    ctx.restore();
+
+    // Recursively draw children
+    for (const child of node.children) {
+      this._drawNodeToCanvas(ctx, child, theme, nodeStyle, scale);
+    }
+  }
+
+  _drawDoodleRect(ctx, x, y, w, h, seed) {
+    // Create a hand-drawn style irregular rectangle
+    const points = [];
+    const segments = 16;
+    const jitter = 2.5;
+
+    // Simple seeded random for consistent results
+    let s = seed || 12345;
+    const rand = () => {
+      s = (s * 16807 + 0) % 2147483647;
+      return (s / 2147483647) * 2 - 1; // -1 to 1
+    };
+
+    // Generate points along the edges with slight jitter
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      // Top edge
+      points.push({ x: x + t * w, y: y + rand() * jitter * 0.8 });
+    }
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      // Right edge
+      points.push({ x: x + w + rand() * jitter, y: y + t * h });
+    }
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      // Bottom edge
+      points.push({ x: x + w - t * w, y: y + h + rand() * jitter * 0.8 });
+    }
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      // Left edge
+      points.push({ x: x + rand() * jitter, y: y + h - t * h });
+    }
+
+    // Draw smooth curve through points
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+
+    for (let i = 0; i < points.length; i++) {
+      const p0 = points[i];
+      const p1 = points[(i + 1) % points.length];
+      const p2 = points[(i + 2) % points.length];
+
+      const cpx = p1.x + (p2.x - p0.x) * 0.12;
+      const cpy = p1.y + (p2.y - p0.y) * 0.12;
+      ctx.quadraticCurveTo(cpx, cpy, p1.x, p1.y);
+    }
+
+    ctx.closePath();
+  }
+
+  _drawSingleNodeToCanvas(ctx, node, x, y, w, h, r, depth, bgColor, isDark, theme, nodeStyle, scale) {
+    const isDoodle = nodeStyle === 'doodle';
+    // Use a simple hash of node position for consistent doodle randomness
+    const seed = Math.abs(Math.floor(node.x * 100 + node.y * 37 + node.depth * 7));
+
+    // Apply rotation for doodle style
+    if (isDoodle) {
+      const centerX = x + w / 2;
+      const centerY = y + h / 2;
+      const rotation = ((seed % 5) - 2) * 0.2; // -0.4 to 0.4 degrees
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate(rotation * Math.PI / 180);
+      ctx.translate(-centerX, -centerY);
+    }
+
+    if (depth === 0) {
+      // Root node: gradient background
+      ctx.shadowColor = 'rgba(0,0,0,0.15)';
+      ctx.shadowBlur = 12 * scale;
+      ctx.shadowOffsetY = 4 * scale;
+
+      const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+      const rootGrad = theme.rootGrad || 'linear-gradient(135deg, #6366F1, #8B5CF6 60%, #EC4899)';
+      const gradColors = rootGrad.match(/#[0-9a-fA-F]{6}/g) || ['#6366F1', '#EC4899'];
+      grad.addColorStop(0, gradColors[0]);
+      grad.addColorStop(1, gradColors[gradColors.length - 1]);
+
+      if (isDoodle) {
+        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      } else {
+        this._roundRect(ctx, x, y, w, h, r);
+      }
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale, `bold ${16 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+    } else if (depth === 1) {
+      // Level 1: solid color background
+      ctx.shadowColor = 'rgba(0,0,0,0.1)';
+      ctx.shadowBlur = 8 * scale;
+      ctx.shadowOffsetY = 2 * scale;
+
+      if (isDoodle) {
+        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      } else {
+        this._roundRect(ctx, x, y, w, h, r);
+      }
+      ctx.fillStyle = node.color;
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale, `bold ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+    } else if (depth === 2) {
+      // Level 2: tinted background with colored border
+      ctx.shadowColor = 'rgba(0,0,0,0.06)';
+      ctx.shadowBlur = 4 * scale;
+
+      if (isDoodle) {
+        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      } else {
+        this._roundRect(ctx, x, y, w, h, r);
+      }
+      ctx.fillStyle = this._mixColors(node.color, bgColor, 0.84);
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.5);
+      ctx.lineWidth = 2.5 * scale;
+      ctx.stroke();
+
+      this._drawTextToCanvas(ctx, node.text, x + 10 * scale, y + h / 2, w - 20 * scale, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
+    } else {
+      // Level 3+: borderless with subtle border
+      if (isDoodle) {
+        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      } else {
+        this._roundRect(ctx, x, y, w, h, r);
+      }
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)';
+      ctx.fill();
+
+      ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.6);
+      ctx.lineWidth = 2 * scale;
+      ctx.stroke();
+
+      this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
+    }
+
+    // Restore rotation for doodle style
+    if (isDoodle) {
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  _drawConnectionsToCanvas(ctx, node, layout, lineStyle, scale) {
+    const style = LINE_STYLES[lineStyle] || LINE_STYLES[DEFAULT_LINE];
+
+    for (const child of node.children) {
+      let parentLeft;
+      if (layout === 'balanced') parentLeft = child._side === 'right';
+      else if (layout === 'left') parentLeft = false;
+      else parentLeft = true;
+
+      const startX = (parentLeft ? node.x + node.width : node.x) * scale;
+      const startY = (node.y + node.height / 2) * scale;
+      const endX = (parentLeft ? child.x : child.x + child.width) * scale;
+      const endY = (child.y + child.height / 2) * scale;
+
+      ctx.save();
+      ctx.strokeStyle = child.color;
+      ctx.lineWidth = Math.max(1.5, 4.5 - child.depth * 0.7) * scale;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (style.dash) {
+        const dashArr = style.dash.split(' ').map(Number);
+        ctx.setLineDash(dashArr.map(d => d * scale));
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+
+      if (style.shape === 'straight') {
+        ctx.lineTo(endX, endY);
+      } else if (style.shape === 'polyline') {
+        const midX = startX + (endX - startX) / 2;
+        ctx.lineTo(midX, startY);
+        ctx.lineTo(midX, endY);
+        ctx.lineTo(endX, endY);
+      } else {
+        // curve
+        const dx = (endX - startX) * 0.5;
+        ctx.bezierCurveTo(startX + dx, startY, endX - dx, endY, endX, endY);
+      }
+
+      ctx.stroke();
+      ctx.restore();
+
+      this._drawConnectionsToCanvas(ctx, child, layout, lineStyle, scale);
+    }
+  }
+
+  async _exportPNG(overlay) {
+    try {
+      const treeInfo = overlay._lmmTreeInfo;
+      const tree = treeInfo && treeInfo.tree;
+      if (!tree) {
+        new obsidian.Notice('No mindmap to export');
+        return;
+      }
+
+      const file = overlay._lmmFile;
+      if (!file) {
+        new obsidian.Notice('No file associated with mindmap');
+        return;
+      }
+
+      const themeKey = overlay._lmmTheme || DEFAULT_THEME;
+      const theme = THEMES[themeKey] || THEMES[DEFAULT_THEME];
+      const layout = overlay._lmmLayout || 'balanced';
+      const lineStyle = overlay._lmmLine || DEFAULT_LINE;
+      const nodeStyle = overlay._lmmNodeStyle || DEFAULT_NODE_STYLE;
+      const scale = 2;
+
+      // Calculate bounds
+      const bounds = this._computeBounds(tree);
+      const w = bounds.maxX - bounds.minX + PAD * 2;
+      const h = bounds.maxY - bounds.minY + PAD * 2;
+
+      // Create offscreen canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = w * scale;
+      canvas.height = h * scale;
+      const ctx = canvas.getContext('2d');
+
+      // Get background color
+      let bgColor = theme.bg;
+      if (!bgColor) {
+        const computedStyle = getComputedStyle(overlay);
+        bgColor = computedStyle.getPropertyValue('--lmm-theme-bg').trim() ||
+                  computedStyle.getPropertyValue('--background-primary').trim() ||
+                  '#FFFFFF';
+      }
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw connections
+      this._drawConnectionsToCanvas(ctx, tree, layout, lineStyle, scale);
+
+      // Draw nodes
+      this._drawNodeToCanvas(ctx, tree, theme, nodeStyle, scale);
+
+      // Convert canvas to blob
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error('Failed to create PNG'));
+        }, 'image/png');
+      });
+
+      // Use Electron dialog to save file
+      const { remote } = require('electron');
+      const { dialog, BrowserWindow } = remote;
+      const win = BrowserWindow.getFocusedWindow();
+
+      const defaultPath = file.parent ? file.parent.path + '/' : '';
+      const result = await dialog.showSaveDialog(win, {
+        title: 'Export Mindmap as PNG',
+        defaultPath: defaultPath + file.basename + '.mindmap.png',
+        filters: [{ name: 'PNG Image', extensions: ['png'] }]
+      });
+
+      if (result.canceled) return;
+
+      // Write file
+      const arrayBuffer = await blob.arrayBuffer();
+      const fs = require('fs');
+      fs.writeFileSync(result.filePath, Buffer.from(arrayBuffer));
+      new obsidian.Notice('Mindmap exported successfully');
+    } catch (e) {
+      console.error('[LightMindMap] export error:', e);
+      new obsidian.Notice('Export failed: ' + e.message);
+    }
+  }
 }
 
 module.exports = LightMindMapPlugin;
+
+/* nosourcemap */

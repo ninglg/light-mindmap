@@ -349,6 +349,55 @@
   border-radius: 999px;
 }
 
+/* ---------- Doodle style: hand-drawn look ---------- */
+
+.lmm-overlay.lmm-node-style-doodle .lmm-node {
+  border-radius: 8px 12px 10px 14px;
+  border-width: 2.5px;
+  border-style: solid;
+  box-shadow: 2px 3px 0px rgba(0, 0, 0, 0.15);
+  transform: rotate(-0.5deg);
+  filter: url(#doodle-filter);
+}
+
+.lmm-overlay.lmm-node-style-doodle .lmm-node-root,
+.lmm-overlay.lmm-node-style-doodle .lmm-node-d0 {
+  border-radius: 14px 10px 12px 8px;
+  transform: rotate(0.3deg);
+  padding: 14px 24px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.lmm-overlay.lmm-node-style-doodle .lmm-node-d1 {
+  border-radius: 10px 14px 8px 12px;
+  transform: rotate(-0.4deg);
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.lmm-overlay.lmm-node-style-doodle .lmm-node-d2 {
+  border-radius: 12px 8px 14px 10px;
+  transform: rotate(0.6deg);
+  padding: 8px 14px;
+}
+
+.lmm-overlay.lmm-node-style-doodle .lmm-node-d3,
+.lmm-overlay.lmm-node-style-doodle .lmm-node-d4,
+.lmm-overlay.lmm-node-style-doodle .lmm-node-d5,
+.lmm-overlay.lmm-node-style-doodle .lmm-node-d6 {
+  border-radius: 8px 12px 10px 14px;
+  transform: rotate(-0.3deg);
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
+/* Doodle toolbar button accent */
+.lmm-overlay.lmm-node-style-doodle .lmm-btn-active {
+  background: linear-gradient(135deg, #E8590C, #D9480F);
+  box-shadow: 0 3px 10px rgba(232, 89, 12, 0.35);
+}
+
 /* ---------- Empty state ---------- */
 
 .lmm-empty {

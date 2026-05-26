@@ -82,6 +82,7 @@ Themes adapt automatically to Obsidian's dark/light mode.
 | **Square**     | Sharp corners                         |
 | **Borderless** | No border or background on leaf nodes |
 | **Pill**       | Fully rounded capsule                 |
+| **Doodle**     | Hand-drawn style with slight rotation |
 
 ### Pan & Zoom
 
@@ -116,13 +117,17 @@ All per-file display preferences are written to frontmatter and restored on next
 | `mindmap-layout` | `balanced` / `right` / `left`                                          |
 | `mindmap-theme`  | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight`      |
 | `mindmap-line`   | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed` |
-| `mindmap-node`   | `rounded` / `square` / `borderless` / `circle`                         |
+| `mindmap-node`   | `rounded` / `square` / `borderless` / `circle` / `doodle`              |
 
 ### Toggle Source View
 
 - **Edit Source** button in the toolbar hides the mind map and shows a floating **Show Mindmap** button
 - Command palette: **Toggle mindmap / source view**
 - Command palette: **Cycle mindmap layout (balanced / right / left)**
+
+### Export PNG
+
+Click the **Export PNG** button in the toolbar to save the current mindmap as a high-resolution PNG image (2x scale). A system file dialog will let you choose the save location.
 
 ## Installation
 
