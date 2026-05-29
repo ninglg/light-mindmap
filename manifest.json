@@ -1,7 +1,7 @@
 {
   "id": "light-mindmap",
   "name": "Light Mindmap",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "minAppVersion": "1.4.0",
   "description": "Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.",
   "author": "Light Ning",

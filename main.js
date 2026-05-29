@@ -50,6 +50,14 @@ const THEMES = {
     bg: '#202531', fg: '#E2E8F0',
     tint1: 'rgba(23,153,243,0.12)', tint2: 'rgba(255,119,34,0.08)',
     rootAccent: '#1799F3'
+  },
+  slate: {
+    name: 'Slate',
+    palette: ['#38BDF8', '#818CF8', '#22D3EE', '#2DD4BF', '#A78BFA', '#34D399', '#67E8F9', '#C084FC', '#5EEAD4', '#7DD3FC', '#93C5FD', '#6EE7B7'],
+    rootGrad: 'linear-gradient(135deg, #0EA5E9, #6366F1 60%, #8B5CF6)',
+    bg: '#2C3341', fg: '#CBD5E1',
+    tint1: 'rgba(14,165,233,0.10)', tint2: 'rgba(99,102,241,0.08)',
+    rootAccent: '#6366F1'
   }
 };
 
@@ -168,6 +176,10 @@ class LightMindMapPlugin extends obsidian.Plugin {
           overlay._lmmLastContent = null;
         }
         if (overlay._lmmLastContent === content) continue;
+        if (this._lmmWriting && existing) {
+          overlay._lmmLastContent = content;
+          continue;
+        }
         overlay.dataset.file = file.path;
         try {
           this._render(overlay, content, fm, file.basename, view, file);
@@ -231,6 +243,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
       const m = line.match(headingRe);
       if (m) {
         const rawText = m[2].trim();
+        const collapsed = /^\*(?!\*)(.+)\*(?!\*)$/.test(rawText);
         headings.push({
           srcIdx: i,
           level: m[1].length,
@@ -240,6 +253,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
           parent: null,
           dirty: false,
           isNew: false,
+          collapsed,
           bodyRaw: '',
         });
       }
@@ -275,6 +289,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
         bodyRaw: '',
         dirty: false,
         isNew: false,
+        collapsed: false,
         isVirtual: true,
       };
       virtualRoot = true;
@@ -329,9 +344,15 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _serializeNode(node, level) {
     const cap = Math.min(6, Math.max(1, level));
-    const text = (node.dirty || node.isNew)
+    let text = (node.dirty || node.isNew)
       ? (node.text || PLACEHOLDER)
       : (node.rawText || node.text || PLACEHOLDER);
+    if (node.collapsed) {
+      const inner = text.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1');
+      text = '*' + inner + '*';
+    } else {
+      text = text.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1');
+    }
     let s = '#'.repeat(cap) + ' ' + text + '\n';
     if (node.bodyRaw && node.bodyRaw.length) {
       s += node.bodyRaw;
@@ -372,6 +393,9 @@ class LightMindMapPlugin extends obsidian.Plugin {
     fab.onclick = () => {
       overlay.classList.remove('lmm-hidden');
       fab.remove();
+      const canvas = overlay.querySelector(':scope > .lmm-canvas');
+      const inner = canvas && canvas.querySelector(':scope > .lmm-inner');
+      if (canvas && inner) this._fitTo(canvas, inner);
     };
   }
 
@@ -550,12 +574,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const fitBtn = zoomGroup.createEl('button', { cls: 'lmm-btn', text: 'Fit' });
     const zoomInBtn = zoomGroup.createEl('button', { cls: 'lmm-btn', text: '+' });
     const zoomOutBtn = zoomGroup.createEl('button', { cls: 'lmm-btn', text: '−' });
-    const resetBtn = zoomGroup.createEl('button', { cls: 'lmm-btn', text: '1:1' });
 
     const right = toolbar.createDiv({ cls: 'lmm-toolbar-group lmm-toolbar-right' });
     const exportBtn = right.createEl('button', { cls: 'lmm-btn', text: 'Export PNG' });
     exportBtn.onclick = () => this._exportPNG(overlay);
-    const editBtn = right.createEl('button', { cls: 'lmm-btn lmm-btn-ghost', text: 'Edit Source' });
+    const editBtn = right.createEl('button', { cls: 'lmm-btn lmm-btn-ghost', text: 'Edit Markdown' });
     editBtn.onclick = () => {
       overlay.classList.add('lmm-hidden');
       this._showRestoreFab(view, overlay);
@@ -586,7 +609,6 @@ class LightMindMapPlugin extends obsidian.Plugin {
     fitBtn.onclick = () => this._fitTo(canvas, inner);
     zoomInBtn.onclick = () => this._zoomBy(canvas, inner, 1.2);
     zoomOutBtn.onclick = () => this._zoomBy(canvas, inner, 1 / 1.2);
-    resetBtn.onclick = () => this._resetTransform(canvas, inner);
 
     this._renderTreeIntoCanvas(overlay, false);
   }
@@ -611,7 +633,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
     requestAnimationFrame(() => {
       this._measureNodes(tree);
-      this._layoutTree(tree, overlay._lmmLayout);
+      this._layoutTree(tree, overlay._lmmLayout, overlay);
       const bounds = this._computeBounds(tree);
       const w = bounds.maxX - bounds.minX + PAD * 2;
       const h = bounds.maxY - bounds.minY + PAD * 2;
@@ -647,11 +669,26 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const el = layer.createDiv({ cls: 'lmm-node lmm-node-d' + node.depth });
     if (node.depth === 0) el.classList.add('lmm-node-root');
     if (node.isVirtual) el.classList.add('lmm-node-virtual');
+    if (node.collapsed && node.children.length) {
+      el.classList.add('lmm-collapsed');
+      el.title = node.children.length + ' hidden — Space to expand';
+    }
     el.style.setProperty('--lmm-color', node.color);
     el.tabIndex = 0;
-    el.textContent = node.text || PLACEHOLDER;
+    if (node.collapsed && node.children.length) {
+      const textSpan = document.createElement('span');
+      textSpan.className = 'lmm-node-text';
+      textSpan.textContent = node.text || PLACEHOLDER;
+      el.appendChild(textSpan);
+      const badge = document.createElement('span');
+      badge.className = 'lmm-collapse-badge';
+      el.appendChild(badge);
+    } else {
+      el.textContent = node.text || PLACEHOLDER;
+    }
     node._el = el;
     this._attachNodeHandlers(el, node, overlay);
+    if (node.collapsed && node.children.length) return;
     for (const child of node.children) this._createNodes(child, layer, overlay);
   }
 
@@ -682,7 +719,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
           const text = el.textContent;
           this._exitEditMode(overlay, node);
           this._updateNodeText(node, text);
-          this._addSibling(overlay, node, true);
+          if (node.depth !== 0) {
+            this._addSibling(overlay, node, true);
+          } else if (node.dirty) {
+            this._persistAndRelayout(overlay);
+          }
         } else if (e.key === 'Tab') {
           e.preventDefault();
           const text = el.textContent;
@@ -696,9 +737,12 @@ class LightMindMapPlugin extends obsidian.Plugin {
       } else {
         if (e.key === 'Enter') {
           e.preventDefault();
-          this._addSibling(overlay, node, true);
+          if (node.depth !== 0) this._addSibling(overlay, node, true);
         } else if (e.key === 'Tab') {
           e.preventDefault();
+          if (node.collapsed && node.children.length) {
+            node.collapsed = false;
+          }
           this._addChild(overlay, node, true);
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
@@ -706,6 +750,9 @@ class LightMindMapPlugin extends obsidian.Plugin {
         } else if (e.key === 'F2') {
           e.preventDefault();
           this._startEdit(overlay, node);
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          this._toggleCollapse(overlay, node);
         }
       }
     });
@@ -725,6 +772,12 @@ class LightMindMapPlugin extends obsidian.Plugin {
   _startEdit(overlay, node) {
     if (!node || !node._el) return;
     if (node.isVirtual) return;
+    if (node.collapsed && node.children && node.children.length) {
+      node.collapsed = false;
+      overlay._lmmPendingEdit = node;
+      this._persistAndRelayout(overlay);
+      return;
+    }
     const el = node._el;
     if (el.isContentEditable) return;
     if (overlay._lmmEditingNode && overlay._lmmEditingNode !== node) {
@@ -783,6 +836,30 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (node._el) node._el.textContent = node.text || PLACEHOLDER;
   }
 
+  _toggleCollapse(overlay, node) {
+    if (!node || !node.children || node.children.length === 0) return;
+    const file = overlay._lmmFile;
+    if (!file) return;
+    node.collapsed = !node.collapsed;
+    const newContent = this._serialize(overlay._lmmParsed, overlay._lmmTreeInfo);
+    const selPath = overlay._lmmSelected ? this._pathFor(overlay._lmmSelected, overlay._lmmTreeInfo) : null;
+    overlay._lmmLastContent = newContent;
+    overlay._lmmParsed = this._parseStructured(newContent);
+    overlay._lmmTreeInfo = this._buildTree(overlay._lmmParsed, file.basename);
+    overlay._lmmSelected = selPath ? this._nodeAtPath(overlay._lmmTreeInfo, selPath) : null;
+    this._renderTreeIntoCanvas(overlay, true);
+    if (overlay._lmmSelected && overlay._lmmSelected._el) {
+      overlay._lmmSelected._el.focus({ preventScroll: true });
+    }
+    this._lmmWriting = true;
+    this.app.vault.modify(file, newContent).then(() => {
+      requestAnimationFrame(() => { this._lmmWriting = false; });
+    }).catch((e) => {
+      this._lmmWriting = false;
+      console.error('[LightMindMap] collapse persist error', e);
+    });
+  }
+
   _newNode(text) {
     return {
       text: text || PLACEHOLDER,
@@ -792,6 +869,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
       bodyRaw: '',
       dirty: true,
       isNew: true,
+      collapsed: false,
       level: 0,
     };
   }
@@ -891,9 +969,17 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
     this._renderTreeIntoCanvas(overlay, true);
 
+    // Restore focus synchronously so keyboard shortcuts work immediately
+    if (overlay._lmmSelected && overlay._lmmSelected._el) {
+      overlay._lmmSelected._el.focus({ preventScroll: true });
+    }
+
     try {
+      this._lmmWriting = true;
       await this.app.vault.modify(file, newContent);
+      requestAnimationFrame(() => { this._lmmWriting = false; });
     } catch (e) {
+      this._lmmWriting = false;
       console.error('[LightMindMap] persist error', e);
       new obsidian.Notice('Failed to save mindmap: ' + e.message);
     }
@@ -930,11 +1016,12 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const r = node._el.getBoundingClientRect();
     node.width = Math.max(r.width, 40);
     node.height = Math.max(r.height, 24);
+    if (node.collapsed) return;
     for (const c of node.children) this._measureNodes(c);
   }
 
   _computeSubtreeHeight(node) {
-    if (node.children.length === 0) {
+    if (node.collapsed || node.children.length === 0) {
       node._sth = node.height;
       return node._sth;
     }
@@ -945,7 +1032,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     return node._sth;
   }
 
-  _layoutTree(root, layout) {
+  _layoutTree(root, layout, overlay) {
     if (layout === 'right') {
       this._computeSubtreeHeight(root);
       this._placeRight(root, 0, 0);
@@ -953,14 +1040,14 @@ class LightMindMapPlugin extends obsidian.Plugin {
       this._computeSubtreeHeight(root);
       this._placeLeft(root, 0, 0);
     } else {
-      this._layoutBalanced(root);
+      this._layoutBalanced(root, overlay);
     }
   }
 
   _placeRight(node, x, yCenter) {
     node.x = x;
     node.y = yCenter - node.height / 2;
-    if (node.children.length === 0) return;
+    if (node.collapsed || node.children.length === 0) return;
     const gap = node.depth === 0 ? ROOT_HGAP : HGAP;
     const childX = x + node.width + gap;
     let totalH = 0;
@@ -977,7 +1064,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   _placeLeft(node, xRight, yCenter) {
     node.x = xRight - node.width;
     node.y = yCenter - node.height / 2;
-    if (node.children.length === 0) return;
+    if (node.collapsed || node.children.length === 0) return;
     const gap = node.depth === 0 ? ROOT_HGAP : HGAP;
     const childRight = node.x - gap;
     let totalH = 0;
@@ -991,7 +1078,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
   }
 
-  _layoutBalanced(root) {
+  _layoutBalanced(root, overlay) {
     const children = root.children;
     if (children.length === 0) {
       root.x = -root.width / 2;
@@ -999,17 +1086,37 @@ class LightMindMapPlugin extends obsidian.Plugin {
       return;
     }
     for (const c of children) this._computeSubtreeHeight(c);
-    const ranked = children.map((c, i) => ({ c, i })).sort((a, b) => b.c._sth - a.c._sth);
-    const right = [];
-    const left = [];
-    let rH = 0;
-    let lH = 0;
-    for (const { c } of ranked) {
-      if (rH <= lH) { right.push(c); rH += c._sth + VGAP; }
-      else { left.push(c); lH += c._sth + VGAP; }
+
+    let right, left;
+    const cached = overlay && overlay._lmmSideCache;
+    if (cached && cached.length === children.length &&
+        cached.every((s, i) => s.text === children[i].text)) {
+      right = [];
+      left = [];
+      for (let i = 0; i < children.length; i++) {
+        if (cached[i].side === 'left') left.push(children[i]);
+        else right.push(children[i]);
+      }
+    } else {
+      const ranked = children.map((c, i) => ({ c, i })).sort((a, b) => b.c._sth - a.c._sth);
+      right = [];
+      left = [];
+      let rH = 0;
+      let lH = 0;
+      for (const { c } of ranked) {
+        if (rH <= lH) { right.push(c); rH += c._sth + VGAP; }
+        else { left.push(c); lH += c._sth + VGAP; }
+      }
+      right.sort((a, b) => children.indexOf(a) - children.indexOf(b));
+      left.sort((a, b) => children.indexOf(a) - children.indexOf(b));
     }
-    right.sort((a, b) => children.indexOf(a) - children.indexOf(b));
-    left.sort((a, b) => children.indexOf(a) - children.indexOf(b));
+
+    if (overlay) {
+      overlay._lmmSideCache = children.map(c => ({
+        text: c.text,
+        side: right.includes(c) ? 'right' : 'left'
+      }));
+    }
 
     root.x = -root.width / 2;
     root.y = -root.height / 2;
@@ -1045,6 +1152,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
       node._el.style.left = node.x + 'px';
       node._el.style.top = node.y + 'px';
     }
+    if (node.collapsed) return;
     for (const c of node.children) this._applyNodePositions(c);
   }
 
@@ -1054,6 +1162,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     b.minY = Math.min(b.minY, node.y);
     b.maxX = Math.max(b.maxX, node.x + node.width);
     b.maxY = Math.max(b.maxY, node.y + node.height);
+    if (node.collapsed) return b;
     for (const c of node.children) this._computeBounds(c, b);
     return b;
   }
@@ -1061,10 +1170,12 @@ class LightMindMapPlugin extends obsidian.Plugin {
   _shiftTree(node, dx, dy) {
     node.x += dx;
     node.y += dy;
+    if (node.collapsed) return;
     for (const c of node.children) this._shiftTree(c, dx, dy);
   }
 
   _drawConnections(node, svg, layout, lineId) {
+    if (node.collapsed) return;
     const style = LINE_STYLES[lineId] || LINE_STYLES[DEFAULT_LINE];
     for (const child of node.children) {
       let parentLeft;
@@ -1142,6 +1253,78 @@ class LightMindMapPlugin extends obsidian.Plugin {
     this.register(() => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
+    });
+
+    // ── Touch support ──
+    let touchId = null;
+    let pinchDist = 0;
+    let pinchMid = { x: 0, y: 0 };
+    let pinchScale = 1;
+    let pinchTx = 0, pinchTy = 0;
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.lmm-node, .lmm-toolbar, .lmm-btn')) return;
+      if (overlay && overlay._lmmEditingNode && overlay._lmmEditingNode._el) {
+        overlay._lmmEditingNode._el.blur();
+        e.preventDefault();
+        return;
+      }
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        touchId = t.identifier;
+        sx = t.clientX; sy = t.clientY;
+        stx = canvas._lmm.tx; sty = canvas._lmm.ty;
+        canvas.classList.add('lmm-dragging');
+        e.preventDefault();
+      } else if (e.touches.length === 2) {
+        touchId = null;
+        canvas.classList.remove('lmm-dragging');
+        const [a, b] = [e.touches[0], e.touches[1]];
+        pinchDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+        pinchMid = { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
+        pinchScale = canvas._lmm.scale;
+        pinchTx = canvas._lmm.tx;
+        pinchTy = canvas._lmm.ty;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && touchId !== null) {
+        const t = e.touches[0];
+        if (t.identifier !== touchId) return;
+        canvas._lmm.tx = stx + (t.clientX - sx);
+        canvas._lmm.ty = sty + (t.clientY - sy);
+        this._applyTransform(inner, canvas._lmm);
+        e.preventDefault();
+      } else if (e.touches.length === 2) {
+        const [a, b] = [e.touches[0], e.touches[1]];
+        const newDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+        const factor = newDist / pinchDist;
+        const newScale = Math.max(0.2, Math.min(3, pinchScale * factor));
+        const rect = canvas.getBoundingClientRect();
+        const ox = pinchMid.x - rect.left;
+        const oy = pinchMid.y - rect.top;
+        const realFactor = newScale / pinchScale;
+        canvas._lmm.tx = ox - (ox - pinchTx) * realFactor;
+        canvas._lmm.ty = oy - (oy - pinchTy) * realFactor;
+        canvas._lmm.scale = newScale;
+        this._applyTransform(inner, canvas._lmm);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (e.touches.length === 0) {
+        touchId = null;
+        canvas.classList.remove('lmm-dragging');
+      } else if (e.touches.length === 1) {
+        // Switched from pinch back to single-finger pan
+        const t = e.touches[0];
+        touchId = t.identifier;
+        sx = t.clientX; sy = t.clientY;
+        stx = canvas._lmm.tx; sty = canvas._lmm.ty;
+      }
     });
     canvas.addEventListener('wheel', (e) => {
       const isZoom = e.ctrlKey || e.metaKey;
@@ -1293,6 +1476,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     ctx.restore();
 
     // Recursively draw children
+    if (node.collapsed) return;
     for (const child of node.children) {
       this._drawNodeToCanvas(ctx, child, theme, nodeStyle, scale);
     }
@@ -1352,8 +1536,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _drawSingleNodeToCanvas(ctx, node, x, y, w, h, r, depth, bgColor, isDark, theme, nodeStyle, scale) {
     const isDoodle = nodeStyle === 'doodle';
+    const isBorderless = nodeStyle === 'borderless';
     // Use a simple hash of node position for consistent doodle randomness
     const seed = Math.abs(Math.floor(node.x * 100 + node.y * 37 + node.depth * 7));
+    const collapsed = node.collapsed && node.children && node.children.length > 0;
+    const badgeExtra = collapsed ? 26 * scale : 0;
 
     // Apply rotation for doodle style
     if (isDoodle) {
@@ -1387,7 +1574,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
       ctx.fill();
 
       ctx.shadowColor = 'transparent';
-      this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale, `bold ${16 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+      this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `bold ${16 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
     } else if (depth === 1) {
       // Level 1: solid color background
       ctx.shadowColor = 'rgba(0,0,0,0.1)';
@@ -1403,41 +1590,68 @@ class LightMindMapPlugin extends obsidian.Plugin {
       ctx.fill();
 
       ctx.shadowColor = 'transparent';
-      this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale, `bold ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+      this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `bold ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
     } else if (depth === 2) {
-      // Level 2: tinted background with colored border
-      ctx.shadowColor = 'rgba(0,0,0,0.06)';
-      ctx.shadowBlur = 4 * scale;
-
-      if (isDoodle) {
-        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      if (isBorderless) {
+        this._drawTextToCanvas(ctx, node.text, x + 10 * scale, y + h / 2, w - 20 * scale - badgeExtra, `600 ${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
       } else {
-        this._roundRect(ctx, x, y, w, h, r);
+        // Level 2: tinted background with colored border
+        ctx.shadowColor = 'rgba(0,0,0,0.06)';
+        ctx.shadowBlur = 4 * scale;
+
+        if (isDoodle) {
+          this._drawDoodleRect(ctx, x, y, w, h, seed);
+        } else {
+          this._roundRect(ctx, x, y, w, h, r);
+        }
+        ctx.fillStyle = this._mixColors(node.color, bgColor, 0.84);
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.5);
+        ctx.lineWidth = 2.5 * scale;
+        ctx.stroke();
+
+        this._drawTextToCanvas(ctx, node.text, x + 10 * scale, y + h / 2, w - 20 * scale - badgeExtra, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
       }
-      ctx.fillStyle = this._mixColors(node.color, bgColor, 0.84);
-      ctx.fill();
-
-      ctx.shadowColor = 'transparent';
-      ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.5);
-      ctx.lineWidth = 2.5 * scale;
-      ctx.stroke();
-
-      this._drawTextToCanvas(ctx, node.text, x + 10 * scale, y + h / 2, w - 20 * scale, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
     } else {
-      // Level 3+: borderless with subtle border
-      if (isDoodle) {
-        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      if (isBorderless) {
+        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
       } else {
-        this._roundRect(ctx, x, y, w, h, r);
+        // Level 3+: subtle border
+        if (isDoodle) {
+          this._drawDoodleRect(ctx, x, y, w, h, seed);
+        } else {
+          this._roundRect(ctx, x, y, w, h, r);
+        }
+        ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)';
+        ctx.fill();
+
+        ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.6);
+        ctx.lineWidth = 2 * scale;
+        ctx.stroke();
+
+        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
       }
-      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)';
+    }
+
+    // Draw collapse badge
+    if (collapsed) {
+      const badgeR = 9 * scale;
+      const padRight = depth === 0 ? 14 : depth === 1 ? 12 : depth === 2 ? 10 : 8;
+      const badgeCX = x + w - padRight * scale - badgeR;
+      const badgeCY = y + h / 2;
+
+      ctx.beginPath();
+      ctx.arc(badgeCX, badgeCY, badgeR, 0, Math.PI * 2);
+      ctx.fillStyle = depth <= 1 ? 'rgba(255,255,255,0.85)' : node.color;
       ctx.fill();
 
-      ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.6);
-      ctx.lineWidth = 2 * scale;
-      ctx.stroke();
-
-      this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
+      const crossLen = 10 * scale;
+      const crossW = 2 * scale;
+      ctx.fillStyle = depth === 0 ? '#6366F1' : depth === 1 ? node.color : '#FFFFFF';
+      ctx.fillRect(badgeCX - crossLen / 2, badgeCY - crossW / 2, crossLen, crossW);
+      ctx.fillRect(badgeCX - crossW / 2, badgeCY - crossLen / 2, crossW, crossLen);
     }
 
     // Restore rotation for doodle style
@@ -1449,6 +1663,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _drawConnectionsToCanvas(ctx, node, layout, lineStyle, scale) {
+    if (node.collapsed) return;
     const style = LINE_STYLES[lineStyle] || LINE_STYLES[DEFAULT_LINE];
 
     for (const child of node.children) {
@@ -1539,6 +1754,23 @@ class LightMindMapPlugin extends obsidian.Plugin {
       }
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Slate theme: draw grid pattern
+      if (themeKey === 'slate') {
+        const gridSize = 32 * scale;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.06)';
+        ctx.lineWidth = 1 * scale;
+        ctx.beginPath();
+        for (let gx = 0; gx <= canvas.width; gx += gridSize) {
+          ctx.moveTo(gx, 0);
+          ctx.lineTo(gx, canvas.height);
+        }
+        for (let gy = 0; gy <= canvas.height; gy += gridSize) {
+          ctx.moveTo(0, gy);
+          ctx.lineTo(canvas.width, gy);
+        }
+        ctx.stroke();
+      }
 
       // Draw connections
       this._drawConnectionsToCanvas(ctx, tree, layout, lineStyle, scale);

@@ -55,7 +55,7 @@
   align-items: center;
 }
 
-.lmm-toolbar-group + .lmm-toolbar-group:not(.lmm-toolbar-right) {
+.lmm-toolbar-group + .lmm-toolbar-group {
   border-left: 1px solid var(--background-modifier-border);
   padding-left: 10px;
 }
@@ -135,6 +135,7 @@
   position: relative;
   overflow: hidden;
   cursor: grab;
+  touch-action: none;
   background-color: var(--lmm-theme-bg, var(--background-primary));
 }
 
@@ -212,6 +213,73 @@
 
 .lmm-node.lmm-selected.lmm-node-root {
   outline-color: var(--lmm-theme-root-accent, #8B5CF6);
+}
+
+/* Collapsed node — inline + badge after text */
+.lmm-node.lmm-collapsed {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.lmm-node.lmm-collapsed > .lmm-node-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.lmm-node.lmm-collapsed > .lmm-collapse-badge {
+  flex-shrink: 0;
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--lmm-color, #6366F1);
+  margin-left: 8px;
+}
+
+.lmm-node.lmm-collapsed > .lmm-collapse-badge::before,
+.lmm-node.lmm-collapsed > .lmm-collapse-badge::after {
+  content: '';
+  position: absolute;
+  background: #fff;
+  border-radius: 1px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.lmm-node.lmm-collapsed > .lmm-collapse-badge::before {
+  width: 10px;
+  height: 2px;
+}
+
+.lmm-node.lmm-collapsed > .lmm-collapse-badge::after {
+  width: 2px;
+  height: 10px;
+}
+
+/* Root/d0: white badge on gradient bg, colored crosshair */
+.lmm-node.lmm-collapsed.lmm-node-root > .lmm-collapse-badge,
+.lmm-node.lmm-collapsed.lmm-node-d0 > .lmm-collapse-badge {
+  background: rgba(255, 255, 255, 0.85);
+}
+.lmm-node.lmm-collapsed.lmm-node-root > .lmm-collapse-badge::before,
+.lmm-node.lmm-collapsed.lmm-node-root > .lmm-collapse-badge::after,
+.lmm-node.lmm-collapsed.lmm-node-d0 > .lmm-collapse-badge::before,
+.lmm-node.lmm-collapsed.lmm-node-d0 > .lmm-collapse-badge::after {
+  background: #6366F1;
+}
+
+/* D1: white badge on colored bg, colored crosshair */
+.lmm-node.lmm-collapsed.lmm-node-d1 > .lmm-collapse-badge {
+  background: rgba(255, 255, 255, 0.85);
+}
+.lmm-node.lmm-collapsed.lmm-node-d1 > .lmm-collapse-badge::before,
+.lmm-node.lmm-collapsed.lmm-node-d1 > .lmm-collapse-badge::after {
+  background: var(--lmm-color, #6366F1);
 }
 
 /* Edit mode — caret visible, text wraps, no ellipsis truncation */
@@ -301,11 +369,21 @@
 }
 
 /* Midnight theme always uses dark-style mixing regardless of obsidian theme */
-.lmm-overlay.lmm-theme-midnight .lmm-node-d2 {
+.lmm-overlay.lmm-theme-midnight .lmm-node-d2,
+.lmm-overlay.lmm-theme-slate .lmm-node-d2 {
   background: color-mix(in srgb, var(--lmm-color) 22%, var(--lmm-theme-bg));
 }
-.lmm-overlay.lmm-theme-midnight .lmm-node {
+.lmm-overlay.lmm-theme-midnight .lmm-node,
+.lmm-overlay.lmm-theme-slate .lmm-node {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* Slate theme — subtle tech grid on canvas */
+.lmm-overlay.lmm-theme-slate .lmm-canvas {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 /* Virtual root (used when multiple top-level headings) */

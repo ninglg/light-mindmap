@@ -52,7 +52,7 @@ Three layout modes, switchable from the toolbar or via command:
 
 ### Themes
 
-Six built-in color palettes:
+Seven built-in color palettes:
 
 | Theme        | Style                                         |
 | ------------ | --------------------------------------------- |
@@ -62,6 +62,7 @@ Six built-in color palettes:
 | **Ocean**    | Blues and indigos on a pale blue background   |
 | **Sunset**   | Reds, oranges, and pinks on a warm background |
 | **Midnight** | Neon accents on a dark slate background       |
+| **Slate**    | Cool blue-grey with a subtle tech grid pattern |
 
 Themes adapt automatically to Obsidian's dark/light mode.
 
@@ -87,10 +88,11 @@ Themes adapt automatically to Obsidian's dark/light mode.
 
 ### Pan & Zoom
 
-- **Drag** the canvas background to pan
+- **Drag** the canvas background to pan (mouse or touch)
+- **Pinch** to zoom on touch devices
 - **Scroll** to pan vertically/horizontally
 - **Ctrl/Cmd + Scroll** to zoom in/out around the cursor
-- Toolbar buttons: **Fit** (fit all nodes into view), **+** / **−** (step zoom), **1:1** (reset to 100%)
+- Toolbar buttons: **Fit** (fit all nodes into view), **+** / **−** (step zoom)
 
 ### Node Editing
 
@@ -106,8 +108,13 @@ Nodes can be edited directly on the canvas — changes are written back to the m
 | Add sibling (without editing) | Select node, press **Enter**                   |
 | Add child (without editing)   | Select node, press **Tab**                     |
 | Delete node                   | Select node, press **Delete** or **Backspace** |
+| Collapse / expand node        | Select node, press **Space**                   |
 
-The root node cannot be deleted.
+- The root node cannot be deleted.
+- Pressing **Enter** on the root node has no effect (no sibling can be added above root).
+- Pressing **Tab** on a collapsed node auto-expands it and adds a new child.
+- Double-clicking or pressing **F2** on a collapsed node auto-expands it and enters edit mode.
+- Collapsed nodes display a **+** badge after the text. The badge is also rendered in exported PNGs.
 
 ### Persisted Settings
 
@@ -116,13 +123,14 @@ All per-file display preferences are written to frontmatter and restored on next
 | Frontmatter key  | Values                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
 | `mindmap-layout` | `balanced` / `right` / `left`                                          |
-| `mindmap-theme`  | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight`      |
+| `mindmap-theme`  | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight` / `slate` |
 | `mindmap-line`   | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed` |
 | `mindmap-node`   | `rounded` / `square` / `borderless` / `circle` / `doodle`              |
 
 ### Toggle Source View
 
-- **Edit Source** button in the toolbar hides the mind map and shows a floating **Show Mindmap** button
+- **Edit Markdown** button in the toolbar hides the mind map and shows a floating **Show Mindmap** button
+- Returning from source view auto-fits the mindmap to the viewport
 - Command palette: **Toggle mindmap / source view**
 - Command palette: **Cycle mindmap layout (balanced / right / left)**
 
