@@ -17,16 +17,22 @@ type: mindmap
 
 # My Plan
 ## Life
-### go to school
-## Work
-### do some paper job
-### do some meeting
+### walk the dog
+### cook dinner
+### call my parents
+## *Work*
+### write report
+### team discussion
+### send emails
 ## Study
-### read book
-### watch movie
+### learn new words
+### listen to podcast
+### practice coding
 ## Shopping
-### buy flowers
-### buy candy
+### buy fruits
+### get stationery
+### pick up snacks
+
 ```
 
 The mind map updates in real time as you edit the source.
