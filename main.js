@@ -181,6 +181,13 @@ class LightMindMapPlugin extends obsidian.Plugin {
           continue;
         }
         overlay.dataset.file = file.path;
+        if (overlay.classList.contains('lmm-hidden')) {
+          overlay._lmmNeedsRerender = true;
+          overlay._lmmStaleContent = content;
+          overlay._lmmStaleFm = fm;
+          overlay._lmmStaleName = file.basename;
+          continue;
+        }
         try {
           this._render(overlay, content, fm, file.basename, view, file);
         } catch (e) {
@@ -389,13 +396,18 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (!view || !view.contentEl) return;
     let fab = view.contentEl.querySelector(':scope > .lmm-fab');
     if (fab) return;
-    fab = view.contentEl.createEl('button', { cls: 'lmm-fab', text: 'Show Mindmap' });
+    fab = view.contentEl.createEl('button', { cls: 'lmm-fab', text: 'Light Mindmap' });
     fab.onclick = () => {
       overlay.classList.remove('lmm-hidden');
       fab.remove();
-      const canvas = overlay.querySelector(':scope > .lmm-canvas');
-      const inner = canvas && canvas.querySelector(':scope > .lmm-inner');
-      if (canvas && inner) this._fitTo(canvas, inner);
+      if (overlay._lmmNeedsRerender) {
+        overlay._lmmNeedsRerender = false;
+        this._render(overlay, overlay._lmmStaleContent, overlay._lmmStaleFm, overlay._lmmStaleName, view, view.file);
+      } else {
+        const canvas = overlay.querySelector(':scope > .lmm-canvas');
+        const inner = canvas && canvas.querySelector(':scope > .lmm-inner');
+        if (canvas && inner) this._fitTo(canvas, inner);
+      }
     };
   }
 
@@ -575,7 +587,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const zoomInBtn = zoomGroup.createEl('button', { cls: 'lmm-btn', text: '+' });
     const zoomOutBtn = zoomGroup.createEl('button', { cls: 'lmm-btn', text: '−' });
 
-    const right = toolbar.createDiv({ cls: 'lmm-toolbar-group lmm-toolbar-right' });
+    const right = toolbar.createDiv({ cls: 'lmm-toolbar-group' });
     const exportBtn = right.createEl('button', { cls: 'lmm-btn', text: 'Export PNG' });
     exportBtn.onclick = () => this._exportPNG(overlay);
     const editBtn = right.createEl('button', { cls: 'lmm-btn lmm-btn-ghost', text: 'Edit Markdown' });
