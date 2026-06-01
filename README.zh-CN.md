@@ -19,23 +19,23 @@
 type: mindmap
 ---
 
-# 我的计划
-## 生活
-### 遛狗
-### 做晚饭
-### 给父母打电话
-## *工作*
-### 写报告
-### 团队讨论
-### 发邮件
-## 学习
-### 背单词
-### 听播客
-### 练习编程
-## 购物
-### 买水果
-### 买文具
-### 零食
+# My Plan
+## Life
+### walk the dog
+### cook dinner
+### call my parents
+## *Work*
+### write report
+### team discussion
+### send emails
+## *Study*
+### learn new words
+### listen to podcast
+### practice coding
+## Shopping
+### buy fruits
+### get stationery
+### pick up snacks
 
 ```
 
@@ -139,7 +139,7 @@ type: mindmap
 
 ### 切换源码视图
 
-- 工具栏中的 **Edit Markdown** 按钮可隐藏思维导图并显示浮动的 **Show Mindmap** 按钮
+- 工具栏中的 **Edit Markdown** 按钮可隐藏思维导图并显示浮动的 **Light Mindmap** 按钮
 - 从源码视图返回时会自动适配导图到视窗
 - 命令面板：**Toggle mindmap / source view**
 - 命令面板：**Cycle mindmap layout (balanced / right / left)**

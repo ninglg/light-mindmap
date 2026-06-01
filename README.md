@@ -27,7 +27,7 @@ type: mindmap
 ### write report
 ### team discussion
 ### send emails
-## Study
+## *Study*
 ### learn new words
 ### listen to podcast
 ### practice coding
@@ -138,7 +138,7 @@ All per-file display preferences are written to frontmatter and restored on next
 
 ### Toggle Source View
 
-- **Edit Markdown** button in the toolbar hides the mind map and shows a floating **Show Mindmap** button
+- **Edit Markdown** button in the toolbar hides the mind map and shows a floating **Light Mindmap** button
 - Returning from source view auto-fits the mindmap to the viewport
 - Command palette: **Toggle mindmap / source view**
 - Command palette: **Cycle mindmap layout (balanced / right / left)**
