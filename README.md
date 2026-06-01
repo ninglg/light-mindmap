@@ -1,4 +1,7 @@
 # Light Mindmap
+
+**English** | [简体中文](README.zh-CN.md)
+
 Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.
 
 ## Preview
