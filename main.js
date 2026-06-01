@@ -1566,43 +1566,52 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
 
     if (depth === 0) {
-      // Root node: gradient background
-      ctx.shadowColor = 'rgba(0,0,0,0.15)';
-      ctx.shadowBlur = 12 * scale;
-      ctx.shadowOffsetY = 4 * scale;
-
-      const grad = ctx.createLinearGradient(x, y, x + w, y + h);
-      const rootGrad = theme.rootGrad || 'linear-gradient(135deg, #6366F1, #8B5CF6 60%, #EC4899)';
-      const gradColors = rootGrad.match(/#[0-9a-fA-F]{6}/g) || ['#6366F1', '#EC4899'];
-      grad.addColorStop(0, gradColors[0]);
-      grad.addColorStop(1, gradColors[gradColors.length - 1]);
-
-      if (isDoodle) {
-        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      if (isBorderless) {
+        const rootColor = theme.rootGrad ? (theme.rootGrad.match(/#[0-9a-fA-F]{6}/g) || ['#6366F1'])[0] : '#6366F1';
+        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `800 ${18 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : rootColor);
       } else {
-        this._roundRect(ctx, x, y, w, h, r);
-      }
-      ctx.fillStyle = grad;
-      ctx.fill();
+        // Root node: gradient background
+        ctx.shadowColor = 'rgba(0,0,0,0.15)';
+        ctx.shadowBlur = 12 * scale;
+        ctx.shadowOffsetY = 4 * scale;
 
-      ctx.shadowColor = 'transparent';
-      this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `bold ${16 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+        const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+        const rootGrad = theme.rootGrad || 'linear-gradient(135deg, #6366F1, #8B5CF6 60%, #EC4899)';
+        const gradColors = rootGrad.match(/#[0-9a-fA-F]{6}/g) || ['#6366F1', '#EC4899'];
+        grad.addColorStop(0, gradColors[0]);
+        grad.addColorStop(1, gradColors[gradColors.length - 1]);
+
+        if (isDoodle) {
+          this._drawDoodleRect(ctx, x, y, w, h, seed);
+        } else {
+          this._roundRect(ctx, x, y, w, h, r);
+        }
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `bold ${16 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+      }
     } else if (depth === 1) {
-      // Level 1: solid color background
-      ctx.shadowColor = 'rgba(0,0,0,0.1)';
-      ctx.shadowBlur = 8 * scale;
-      ctx.shadowOffsetY = 2 * scale;
-
-      if (isDoodle) {
-        this._drawDoodleRect(ctx, x, y, w, h, seed);
+      if (isBorderless) {
+        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `700 ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : node.color);
       } else {
-        this._roundRect(ctx, x, y, w, h, r);
-      }
-      ctx.fillStyle = node.color;
-      ctx.fill();
+        // Level 1: solid color background
+        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+        ctx.shadowBlur = 8 * scale;
+        ctx.shadowOffsetY = 2 * scale;
 
-      ctx.shadowColor = 'transparent';
-      this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `bold ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+        if (isDoodle) {
+          this._drawDoodleRect(ctx, x, y, w, h, seed);
+        } else {
+          this._roundRect(ctx, x, y, w, h, r);
+        }
+        ctx.fillStyle = node.color;
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `bold ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+      }
     } else if (depth === 2) {
       if (isBorderless) {
         this._drawTextToCanvas(ctx, node.text, x + 10 * scale, y + h / 2, w - 20 * scale - badgeExtra, `600 ${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
