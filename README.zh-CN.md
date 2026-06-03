@@ -144,6 +144,10 @@ type: mindmap
 - 命令面板：**Toggle mindmap / source view**
 - 命令面板：**Cycle mindmap layout (balanced / right / left)**
 
+### 外部链接
+
+标题中的 Markdown 链接（`[文本](url)`）会直接在思维导图画布上渲染为可点击的链接。点击链接会在默认浏览器中打开。编辑节点时，链接会显示为纯文本以便修改。
+
 ### 导出 PNG
 
 点击工具栏中的 **Export PNG** 按钮，将当前思维导图保存为高清 PNG 图片（2 倍分辨率）。系统文件对话框允许你选择保存位置。

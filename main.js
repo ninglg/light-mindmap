@@ -235,6 +235,37 @@ class LightMindMapPlugin extends obsidian.Plugin {
       .trim();
   }
 
+  _renderNodeContent(el, node, overlay) {
+    const raw = node.rawText || node.text || '';
+    if (!raw.includes('](')) {
+      el.textContent = node.text || PLACEHOLDER;
+      return;
+    }
+    el.textContent = '';
+    const re = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(raw)) !== null) {
+      if (m.index > last) {
+        el.appendChild(document.createTextNode(raw.slice(last, m.index)));
+      }
+      const a = document.createElement('a');
+      a.className = 'lmm-link';
+      a.textContent = m[1];
+      a.href = m[2];
+      a.target = '_blank';
+      a.rel = 'noopener';
+      el.appendChild(a);
+      last = m.index + m[0].length;
+    }
+    if (last < raw.length) {
+      el.appendChild(document.createTextNode(raw.slice(last)));
+    }
+    if (el.childNodes.length === 0) {
+      el.textContent = node.text || PLACEHOLDER;
+    }
+  }
+
   _parseStructured(content) {
     const { frontmatterRaw, body } = this._splitFrontmatter(content);
     const lines = body.split('\n');
@@ -356,9 +387,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _serializeNode(node, level) {
     const cap = Math.min(6, Math.max(1, level));
-    let text = (node.dirty || node.isNew)
-      ? (node.text || PLACEHOLDER)
-      : (node.rawText || node.text || PLACEHOLDER);
+    let text = node.rawText || node.text || PLACEHOLDER;
     if (node.collapsed) {
       const inner = text.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1');
       text = '*' + inner + '*';
@@ -713,13 +742,13 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (node.collapsed && node.children.length) {
       const textSpan = document.createElement('span');
       textSpan.className = 'lmm-node-text';
-      textSpan.textContent = node.text || PLACEHOLDER;
+      this._renderNodeContent(textSpan, node, overlay);
       el.appendChild(textSpan);
       const badge = document.createElement('span');
       badge.className = 'lmm-collapse-badge';
       el.appendChild(badge);
     } else {
-      el.textContent = node.text || PLACEHOLDER;
+      this._renderNodeContent(el, node, overlay);
     }
     node._el = el;
     this._attachNodeHandlers(el, node, overlay);
@@ -740,6 +769,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       if (el.isContentEditable) return;
+      if (e.target.closest('.lmm-link')) return;
       this._selectNode(overlay, node, true);
     });
     el.addEventListener('dblclick', (e) => {
@@ -820,6 +850,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
     this._selectNode(overlay, node, false);
     overlay._lmmEditingNode = node;
+    el.textContent = node.rawText || node.text || PLACEHOLDER;
     el.contentEditable = 'true';
     el.classList.add('lmm-editing');
     el.spellcheck = false;
@@ -835,10 +866,10 @@ class LightMindMapPlugin extends obsidian.Plugin {
       if (overlay._lmmEditingBlur === onBlur) overlay._lmmEditingBlur = null;
       if (!el.isContentEditable) return;
       const text = el.textContent;
-      const had = node.text;
+      const had = node.rawText || node.text;
       this._exitEditMode(overlay, node);
       this._updateNodeText(node, text);
-      if (node.text !== had) this._persistAndRelayout(overlay);
+      if ((node.rawText || node.text) !== had) this._persistAndRelayout(overlay);
     };
     el.addEventListener('blur', onBlur);
     overlay._lmmEditingBlur = onBlur;
@@ -854,21 +885,22 @@ class LightMindMapPlugin extends obsidian.Plugin {
     el.contentEditable = 'false';
     el.classList.remove('lmm-editing');
     if (overlay._lmmEditingNode === node) overlay._lmmEditingNode = null;
+    this._renderNodeContent(el, node, overlay);
   }
 
   _updateNodeText(node, newText) {
     const text = (newText || '').replace(/\s+/g, ' ').trim();
     if (!text) return;
-    if (text !== node.text) {
-      node.text = text;
+    const hadRaw = node.rawText || node.text;
+    if (text !== hadRaw) {
+      node.rawText = text;
+      node.text = this._stripInline(text);
       node.dirty = true;
-      if (node._el) node._el.textContent = text;
     }
   }
 
   _cancelEdit(overlay, node) {
     this._exitEditMode(overlay, node);
-    if (node._el) node._el.textContent = node.text || PLACEHOLDER;
   }
 
   _toggleCollapse(overlay, node) {

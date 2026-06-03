@@ -143,6 +143,10 @@ All per-file display preferences are written to frontmatter and restored on next
 - Command palette: **Toggle mindmap / source view**
 - Command palette: **Cycle mindmap layout (balanced / right / left)**
 
+### External Links
+
+Markdown links in heading text (`[text](url)`) are rendered as clickable links directly on the mindmap canvas. Clicking a link opens it in the default browser. During node editing, links are shown as plain text for easy modification.
+
 ### Export PNG
 
 Click the **Export PNG** button in the toolbar to save the current mindmap as a high-resolution PNG image (2x scale). A system file dialog will let you choose the save location.

@@ -560,3 +560,24 @@
 .lmm-fab:active {
   transform: translateY(0);
 }
+
+/* ── Node links ── */
+
+.lmm-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.lmm-link:hover {
+  text-decoration-style: solid;
+  opacity: 0.85;
+}
+
+.lmm-node.lmm-editing .lmm-link {
+  text-decoration: none;
+  pointer-events: none;
+}
