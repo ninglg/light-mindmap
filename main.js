@@ -141,8 +141,13 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   onunload() {
-    document.querySelectorAll('.lmm-overlay').forEach((el) => el.remove());
+    document.querySelectorAll('.lmm-overlay').forEach((el) => {
+      if (el._lmmCleanup) el._lmmCleanup();
+      el.remove();
+    });
     document.querySelectorAll('.lmm-fab').forEach((el) => el.remove());
+    const doodleSvg = document.getElementById('lmm-doodle-filter');
+    if (doodleSvg) doodleSvg.closest('svg').remove();
   }
 
   async _doScan() {
@@ -176,7 +181,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
           overlay._lmmLastContent = null;
         }
         if (overlay._lmmLastContent === content) continue;
-        if (this._lmmWriting && existing) {
+        if (overlay._lmmWriting && existing) {
           overlay._lmmLastContent = content;
           continue;
         }
@@ -468,6 +473,19 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
   }
 
+  async _batchPersistFrontmatter(file, updates) {
+    if (!file || !updates || Object.keys(updates).length === 0) return;
+    try {
+      await this.app.fileManager.processFrontMatter(file, (fm) => {
+        for (const [key, value] of Object.entries(updates)) {
+          fm[key] = value;
+        }
+      });
+    } catch (e) {
+      console.error('[LightMindMap] frontmatter batch persist error', e);
+    }
+  }
+
   _render(overlay, content, frontmatter, fileBasename, view, file) {
     overlay._lmmLastContent = content;
     overlay._lmmView = view;
@@ -478,32 +496,30 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const fmLayoutValid = fmLayout && ['balanced', 'right', 'left'].includes(String(fmLayout));
     const layout = overlay._lmmLayout || (fmLayoutValid ? String(fmLayout) : 'balanced');
     overlay._lmmLayout = layout;
-    if (!fmLayoutValid) {
-      this._persistFrontmatterValue(file, 'mindmap-layout', layout);
-    }
 
     const fmTheme = frontmatter && (frontmatter['mindmap-theme'] || frontmatter['mindmap_theme']);
     const fmThemeValid = fmTheme && THEMES[String(fmTheme).toLowerCase()];
     const themeId = overlay._lmmTheme && THEMES[overlay._lmmTheme] ? overlay._lmmTheme : this._resolveTheme(frontmatter);
     this._applyThemeToOverlay(overlay, themeId);
-    if (!fmThemeValid) {
-      this._persistFrontmatterValue(file, 'mindmap-theme', overlay._lmmTheme);
-    }
 
     const fmLine = frontmatter && (frontmatter['mindmap-line'] || frontmatter['mindmap_line']);
     const fmLineValid = fmLine && LINE_STYLES[String(fmLine).toLowerCase()];
     const lineId = overlay._lmmLine && LINE_STYLES[overlay._lmmLine] ? overlay._lmmLine : this._resolveLine(frontmatter);
     overlay._lmmLine = lineId;
-    if (!fmLineValid) {
-      this._persistFrontmatterValue(file, 'mindmap-line', lineId);
-    }
 
     const fmNodeStyle = frontmatter && (frontmatter['mindmap-node'] || frontmatter['mindmap_node']);
     const fmNodeStyleValid = fmNodeStyle && NODE_STYLES[String(fmNodeStyle).toLowerCase()];
     const nodeStyleId = overlay._lmmNodeStyle && NODE_STYLES[overlay._lmmNodeStyle] ? overlay._lmmNodeStyle : this._resolveNodeStyle(frontmatter);
     this._applyNodeStyleToOverlay(overlay, nodeStyleId);
-    if (!fmNodeStyleValid) {
-      this._persistFrontmatterValue(file, 'mindmap-node', overlay._lmmNodeStyle);
+
+    // Batch frontmatter writes into a single call to avoid cascading re-renders
+    const fmUpdates = {};
+    if (!fmLayoutValid) fmUpdates['mindmap-layout'] = layout;
+    if (!fmThemeValid) fmUpdates['mindmap-theme'] = overlay._lmmTheme;
+    if (!fmLineValid) fmUpdates['mindmap-line'] = lineId;
+    if (!fmNodeStyleValid) fmUpdates['mindmap-node'] = overlay._lmmNodeStyle;
+    if (Object.keys(fmUpdates).length) {
+      this._batchPersistFrontmatter(file, fmUpdates);
     }
 
     const parsed = this._parseStructured(content);
@@ -514,6 +530,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     overlay._lmmPendingEdit = null;
     overlay._lmmEditingNode = null;
 
+    if (overlay._lmmCleanup) overlay._lmmCleanup();
     overlay.empty();
 
     const toolbar = overlay.createDiv({ cls: 'lmm-toolbar' });
@@ -597,8 +614,14 @@ class LightMindMapPlugin extends obsidian.Plugin {
     };
 
     if (!treeInfo.tree) {
-      overlay.createDiv({ cls: 'lmm-empty' }).innerHTML =
-        '<div class="lmm-empty-icon">🧠</div><div>Add headings (e.g. <code># Title</code>, <code>## Branch</code>) to render the mind map.</div>';
+      const empty = overlay.createDiv({ cls: 'lmm-empty' });
+      empty.createDiv({ cls: 'lmm-empty-icon', text: '🧠' });
+      const msg = empty.createDiv();
+      msg.appendText('Add headings (e.g. ');
+      msg.createEl('code', { text: '# Title' });
+      msg.appendText(', ');
+      msg.createEl('code', { text: '## Branch' });
+      msg.appendText(') to render the mind map.');
       return;
     }
 
@@ -863,11 +886,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (overlay._lmmSelected && overlay._lmmSelected._el) {
       overlay._lmmSelected._el.focus({ preventScroll: true });
     }
-    this._lmmWriting = true;
+    overlay._lmmWriting = true;
     this.app.vault.modify(file, newContent).then(() => {
-      requestAnimationFrame(() => { this._lmmWriting = false; });
+      requestAnimationFrame(() => { overlay._lmmWriting = false; });
     }).catch((e) => {
-      this._lmmWriting = false;
+      overlay._lmmWriting = false;
       console.error('[LightMindMap] collapse persist error', e);
     });
   }
@@ -987,11 +1010,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
 
     try {
-      this._lmmWriting = true;
+      overlay._lmmWriting = true;
       await this.app.vault.modify(file, newContent);
-      requestAnimationFrame(() => { this._lmmWriting = false; });
+      requestAnimationFrame(() => { overlay._lmmWriting = false; });
     } catch (e) {
-      this._lmmWriting = false;
+      overlay._lmmWriting = false;
       console.error('[LightMindMap] persist error', e);
       new obsidian.Notice('Failed to save mindmap: ' + e.message);
     }
@@ -1262,10 +1285,12 @@ class LightMindMapPlugin extends obsidian.Plugin {
     canvas.addEventListener('mousedown', onDown);
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    this.register(() => {
+    const prevCleanup = overlay._lmmCleanup;
+    overlay._lmmCleanup = () => {
+      if (prevCleanup) prevCleanup();
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-    });
+    };
 
     // ── Touch support ──
     let touchId = null;
@@ -1732,6 +1757,28 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
   }
 
+  async _saveWithDialog(file, arrayBuffer) {
+    const uint8 = new Uint8Array(arrayBuffer);
+    const defaultName = (file.basename || 'mindmap') + '.mindmap.png';
+    try {
+      const electron = require('electron');
+      const win = electron.remote.BrowserWindow.getFocusedWindow();
+      const result = await electron.remote.dialog.showSaveDialog(win, {
+        title: 'Export Mindmap as PNG',
+        defaultPath: defaultName,
+        filters: [{ name: 'PNG Image', extensions: ['png'] }]
+      });
+      if (result.canceled || !result.filePath) return false;
+      require('fs').writeFileSync(result.filePath, Buffer.from(arrayBuffer));
+      return true;
+    } catch (e) {
+      // Fallback: save directly into vault
+      const filePath = (file.parent ? file.parent.path + '/' : '') + defaultName;
+      await this.app.vault.adapter.writeBinary(filePath, uint8);
+      return true;
+    }
+  }
+
   async _exportPNG(overlay) {
     try {
       const treeInfo = overlay._lmmTreeInfo;
@@ -1758,6 +1805,18 @@ class LightMindMapPlugin extends obsidian.Plugin {
       const bounds = this._computeBounds(tree);
       const w = bounds.maxX - bounds.minX + PAD * 2;
       const h = bounds.maxY - bounds.minY + PAD * 2;
+
+      // Save original positions and temporarily shift for export
+      const savedPositions = [];
+      const shiftDx = PAD - bounds.minX;
+      const shiftDy = PAD - bounds.minY;
+      const saveAndShift = (node) => {
+        savedPositions.push({ node, x: node.x, y: node.y });
+        node.x += shiftDx;
+        node.y += shiftDy;
+        if (!node.collapsed) node.children.forEach(saveAndShift);
+      };
+      saveAndShift(tree);
 
       // Create offscreen canvas
       const canvas = document.createElement('canvas');
@@ -1799,6 +1858,12 @@ class LightMindMapPlugin extends obsidian.Plugin {
       // Draw nodes
       this._drawNodeToCanvas(ctx, tree, theme, nodeStyle, scale);
 
+      // Restore original positions
+      for (const { node, x, y } of savedPositions) {
+        node.x = x;
+        node.y = y;
+      }
+
       // Convert canvas to blob
       const blob = await new Promise((resolve, reject) => {
         canvas.toBlob((b) => {
@@ -1807,24 +1872,10 @@ class LightMindMapPlugin extends obsidian.Plugin {
         }, 'image/png');
       });
 
-      // Use Electron dialog to save file
-      const { remote } = require('electron');
-      const { dialog, BrowserWindow } = remote;
-      const win = BrowserWindow.getFocusedWindow();
-
-      const defaultPath = file.parent ? file.parent.path + '/' : '';
-      const result = await dialog.showSaveDialog(win, {
-        title: 'Export Mindmap as PNG',
-        defaultPath: defaultPath + file.basename + '.mindmap.png',
-        filters: [{ name: 'PNG Image', extensions: ['png'] }]
-      });
-
-      if (result.canceled) return;
-
-      // Write file
+      // Prompt user for save location
       const arrayBuffer = await blob.arrayBuffer();
-      const fs = require('fs');
-      fs.writeFileSync(result.filePath, Buffer.from(arrayBuffer));
+      const saved = await this._saveWithDialog(file, arrayBuffer);
+      if (!saved) return;
       new obsidian.Notice('Mindmap exported successfully');
     } catch (e) {
       console.error('[LightMindMap] export error:', e);
