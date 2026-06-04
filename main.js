@@ -119,13 +119,13 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
     this.addCommand({
       id: 'lmm-cycle-layout',
-      name: 'Cycle mindmap layout (balanced / right / left)',
+      name: 'Cycle mindmap layout (balanced / right / left / tree / radial)',
       callback: () => {
         const v = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
         if (!v) return;
         const o = v.contentEl.querySelector(':scope > .lmm-overlay');
         if (!o) return;
-        const layouts = ['balanced', 'right', 'left'];
+        const layouts = ['balanced', 'right', 'left', 'tree', 'radial'];
         const cur = o._lmmLayout || 'balanced';
         const next = layouts[(layouts.indexOf(cur) + 1) % layouts.length];
         o._lmmLayout = next;
@@ -545,7 +545,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     overlay._lmmFrontmatter = frontmatter;
 
     const fmLayout = frontmatter && (frontmatter['mindmap-layout'] || frontmatter['mindmap_layout'] || frontmatter.layout);
-    const fmLayoutValid = fmLayout && ['balanced', 'right', 'left'].includes(String(fmLayout));
+    const fmLayoutValid = fmLayout && ['balanced', 'right', 'left', 'tree', 'radial'].includes(String(fmLayout));
     const layout = overlay._lmmLayout || (fmLayoutValid ? String(fmLayout) : 'balanced');
     overlay._lmmLayout = layout;
 
@@ -588,22 +588,24 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const toolbar = overlay.createDiv({ cls: 'lmm-toolbar' });
     const layoutGroup = toolbar.createDiv({ cls: 'lmm-toolbar-group' });
     layoutGroup.createSpan({ cls: 'lmm-toolbar-label', text: 'Layout' });
-    const layoutBtns = {};
-    for (const l of [{ id: 'balanced', label: 'Balanced' }, { id: 'right', label: 'Right' }, { id: 'left', label: 'Left' }]) {
-      const btn = layoutGroup.createEl('button', {
-        cls: 'lmm-btn' + (l.id === layout ? ' lmm-btn-active' : ''),
-        text: l.label
-      });
-      btn.onclick = () => {
-        if (overlay._lmmLayout === l.id) return;
-        overlay._lmmLayout = l.id;
-        Object.values(layoutBtns).forEach((b) => b.classList.remove('lmm-btn-active'));
-        btn.classList.add('lmm-btn-active');
-        this._renderTreeIntoCanvas(overlay, false);
-        this._persistFrontmatterValue(file, 'mindmap-layout', l.id);
-      };
-      layoutBtns[l.id] = btn;
+    const layoutSelect = layoutGroup.createEl('select', { cls: 'lmm-select' });
+    for (const l of [
+      { id: 'balanced', label: 'Balanced' },
+      { id: 'right', label: 'Right' },
+      { id: 'left', label: 'Left' },
+      { id: 'tree', label: 'Tree' },
+      { id: 'radial', label: 'Radial' },
+    ]) {
+      const opt = layoutSelect.createEl('option', { value: l.id, text: l.label });
+      if (l.id === layout) opt.selected = true;
     }
+    layoutSelect.onchange = () => {
+      const id = layoutSelect.value;
+      if (overlay._lmmLayout === id) return;
+      overlay._lmmLayout = id;
+      this._renderTreeIntoCanvas(overlay, false);
+      this._persistFrontmatterValue(file, 'mindmap-layout', id);
+    };
 
     const themeGroup = toolbar.createDiv({ cls: 'lmm-toolbar-group' });
     themeGroup.createSpan({ cls: 'lmm-toolbar-label', text: 'Theme' });
@@ -1127,6 +1129,10 @@ class LightMindMapPlugin extends obsidian.Plugin {
     } else if (layout === 'left') {
       this._computeSubtreeHeight(root);
       this._placeLeft(root, 0, 0);
+    } else if (layout === 'tree') {
+      this._layoutStandardTree(root);
+    } else if (layout === 'radial') {
+      this._layoutRadial(root, 0, 0, -1, -1);
     } else {
       this._layoutBalanced(root, overlay);
     }
@@ -1235,6 +1241,82 @@ class LightMindMapPlugin extends obsidian.Plugin {
     for (const c of node.children) this._markSide(c, side);
   }
 
+  _computeSubtreeWidth(node) {
+    if (node.collapsed || node.children.length === 0) {
+      node._stw = node.width;
+      return node._stw;
+    }
+    let total = 0;
+    for (const c of node.children) total += this._computeSubtreeWidth(c);
+    total += (node.children.length - 1) * HGAP;
+    node._stw = Math.max(node.width, total);
+    return node._stw;
+  }
+
+  _layoutStandardTree(root) {
+    this._computeSubtreeWidth(root);
+    root.x = -root.width / 2;
+    root.y = 0;
+    if (root.collapsed || root.children.length === 0) return;
+    const gap = ROOT_HGAP;
+    const childY = root.y + root.height + gap;
+    let totalW = root.children.reduce((s, c) => s + c._stw, 0) + (root.children.length - 1) * HGAP;
+    let cx = -totalW / 2;
+    for (const c of root.children) {
+      this._placeBelow(c, cx, childY);
+      cx += c._stw + HGAP;
+    }
+  }
+
+  _placeBelow(node, xLeft, y) {
+    node.x = xLeft + (node._stw - node.width) / 2;
+    node.y = y;
+    if (node.collapsed || node.children.length === 0) return;
+    const gap = HGAP;
+    const childY = y + node.height + gap;
+    let totalW = node.children.reduce((s, c) => s + c._stw, 0) + (node.children.length - 1) * HGAP;
+    let cx = xLeft + (node._stw - totalW) / 2;
+    for (const c of node.children) {
+      this._placeBelow(c, cx, childY);
+      cx += c._stw + HGAP;
+    }
+  }
+
+  _layoutRadial(root, cx, cy, startAngle, endAngle) {
+    root.x = cx - root.width / 2;
+    root.y = cy - root.height / 2;
+    if (root.collapsed || root.children.length === 0) return;
+
+    const children = root.children;
+    const weights = children.map(c => {
+      this._computeSubtreeHeight(c);
+      return Math.max(c._sth, 40);
+    });
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+    const levelRadius = Math.max(180, children.length * 40);
+
+    let angle;
+    if (startAngle < 0) {
+      angle = 0;
+    } else {
+      angle = startAngle;
+    }
+    const angleRange = startAngle < 0 ? 2 * Math.PI : endAngle - startAngle;
+
+    for (let i = 0; i < children.length; i++) {
+      const share = weights[i] / totalWeight;
+      const childAngle = angle + share * angleRange / 2;
+      const childCx = cx + levelRadius * Math.cos(childAngle);
+      const childCy = cy + levelRadius * Math.sin(childAngle);
+
+      const childStartAngle = angle;
+      const childEndAngle = angle + share * angleRange;
+      this._layoutRadial(children[i], childCx, childCy, childStartAngle, childEndAngle);
+      angle += share * angleRange;
+    }
+  }
+
   _applyNodePositions(node) {
     if (node._el) {
       node._el.style.left = node.x + 'px';
@@ -1266,24 +1348,59 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (node.collapsed) return;
     const style = LINE_STYLES[lineId] || LINE_STYLES[DEFAULT_LINE];
     for (const child of node.children) {
-      let parentLeft;
-      if (layout === 'balanced') parentLeft = child._side === 'right';
-      else if (layout === 'left') parentLeft = false;
-      else parentLeft = true;
-      const startX = parentLeft ? node.x + node.width : node.x;
-      const startY = node.y + node.height / 2;
-      const endX = parentLeft ? child.x : child.x + child.width;
-      const endY = child.y + child.height / 2;
+      let startX, startY, endX, endY;
+      if (layout === 'radial') {
+        startX = node.x + node.width / 2;
+        startY = node.y + node.height / 2;
+        endX = child.x + child.width / 2;
+        endY = child.y + child.height / 2;
+      } else if (layout === 'tree') {
+        startX = node.x + node.width / 2;
+        startY = node.y + node.height;
+        endX = child.x + child.width / 2;
+        endY = child.y;
+      } else {
+        let parentLeft;
+        if (layout === 'balanced') parentLeft = child._side === 'right';
+        else if (layout === 'left') parentLeft = false;
+        else parentLeft = true;
+        startX = parentLeft ? node.x + node.width : node.x;
+        startY = node.y + node.height / 2;
+        endX = parentLeft ? child.x : child.x + child.width;
+        endY = child.y + child.height / 2;
+      }
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       let d;
       if (style.shape === 'straight') {
         d = `M ${startX} ${startY} L ${endX} ${endY}`;
       } else if (style.shape === 'polyline') {
-        const midX = startX + (endX - startX) / 2;
-        d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+        if (layout === 'tree') {
+          const midY = startY + (endY - startY) / 2;
+          d = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
+        } else if (layout === 'radial') {
+          d = `M ${startX} ${startY} L ${endX} ${endY}`;
+        } else {
+          const midX = startX + (endX - startX) / 2;
+          d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+        }
       } else {
-        const dx = (endX - startX) * 0.5;
-        d = `M ${startX} ${startY} C ${startX + dx} ${startY}, ${endX - dx} ${endY}, ${endX} ${endY}`;
+        if (layout === 'tree') {
+          const dy = (endY - startY) * 0.4;
+          d = `M ${startX} ${startY} C ${startX} ${startY + dy}, ${endX} ${endY - dy}, ${endX} ${endY}`;
+        } else if (layout === 'radial') {
+          const dx = endX - startX;
+          const dy = endY - startY;
+          const dist = Math.sqrt(dx * dx + dy * dy) * 0.35;
+          const angle = Math.atan2(dy, dx);
+          const cx1 = startX + dist * Math.cos(angle);
+          const cy1 = startY + dist * Math.sin(angle);
+          const cx2 = endX - dist * Math.cos(angle);
+          const cy2 = endY - dist * Math.sin(angle);
+          d = `M ${startX} ${startY} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${endX} ${endY}`;
+        } else {
+          const dx = (endX - startX) * 0.5;
+          d = `M ${startX} ${startY} C ${startX + dx} ${startY}, ${endX - dx} ${endY}, ${endX} ${endY}`;
+        }
       }
       path.setAttribute('d', d);
       path.setAttribute('stroke', child.color);
@@ -1529,22 +1646,44 @@ class LightMindMapPlugin extends obsidian.Plugin {
     ctx.closePath();
   }
 
-  _drawTextToCanvas(ctx, text, x, y, maxW, font, color, align) {
+  _drawTextToCanvas(ctx, text, x, y, maxW, font, color, align, letterSpacing) {
     ctx.save();
     ctx.font = font;
     ctx.fillStyle = color;
-    ctx.textAlign = align || 'left';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
     let displayText = text;
-    let metrics = ctx.measureText(displayText);
-    if (metrics.width > maxW) {
-      while (displayText.length > 0 && ctx.measureText(displayText + '...').width > maxW) {
+    const ls = letterSpacing || 0;
+
+    // Measure with letter-spacing (CSS letter-spacing applies after each char)
+    const measureWithLS = (t) => {
+      let w = 0;
+      for (let i = 0; i < t.length; i++) w += ctx.measureText(t[i]).width + ls;
+      return w;
+    };
+
+    let tw = measureWithLS(displayText);
+    if (tw > maxW) {
+      while (displayText.length > 0 && measureWithLS(displayText + '...') > maxW) {
         displayText = displayText.slice(0, -1);
       }
       displayText += '...';
     }
-    ctx.fillText(displayText, x, y);
+
+    const alignType = align || 'left';
+    let drawX = x;
+    if (alignType === 'center') {
+      drawX = x - measureWithLS(displayText) / 2;
+    } else if (alignType === 'right') {
+      drawX = x - measureWithLS(displayText);
+    }
+
+    for (let i = 0; i < displayText.length; i++) {
+      const ch = displayText[i];
+      ctx.fillText(ch, drawX, y);
+      drawX += ctx.measureText(ch).width + ls;
+    }
     ctx.restore();
   }
 
@@ -1643,10 +1782,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
       ctx.translate(-centerX, -centerY);
     }
 
+    const fontBase = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
     if (depth === 0) {
       if (isBorderless) {
         const rootColor = theme.rootGrad ? (theme.rootGrad.match(/#[0-9a-fA-F]{6}/g) || ['#6366F1'])[0] : '#6366F1';
-        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `800 ${18 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : rootColor);
+        this._drawTextToCanvas(ctx, node.text, x + 26 * scale, y + h / 2, w - 52 * scale - badgeExtra, `700 ${18 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : rootColor, 'left', 0.3 * scale);
       } else {
         // Root node: gradient background
         ctx.shadowColor = 'rgba(0,0,0,0.15)';
@@ -1668,11 +1808,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
         ctx.fill();
 
         ctx.shadowColor = 'transparent';
-        this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `bold ${16 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+        this._drawTextToCanvas(ctx, node.text, x + 26 * scale, y + h / 2, w - 52 * scale - badgeExtra, `700 ${18 * scale}px ${fontBase}`, '#FFFFFF', 'left', 0.3 * scale);
       }
     } else if (depth === 1) {
       if (isBorderless) {
-        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `700 ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : node.color);
+        this._drawTextToCanvas(ctx, node.text, x + 18 * scale, y + h / 2, w - 36 * scale - badgeExtra, `600 ${15 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : node.color);
       } else {
         // Level 1: solid color background
         ctx.shadowColor = 'rgba(0,0,0,0.1)';
@@ -1688,11 +1828,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
         ctx.fill();
 
         ctx.shadowColor = 'transparent';
-        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `bold ${14 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, '#FFFFFF');
+        this._drawTextToCanvas(ctx, node.text, x + 18 * scale, y + h / 2, w - 36 * scale - badgeExtra, `600 ${15 * scale}px ${fontBase}`, '#FFFFFF');
       }
     } else if (depth === 2) {
       if (isBorderless) {
-        this._drawTextToCanvas(ctx, node.text, x + 10 * scale, y + h / 2, w - 20 * scale - badgeExtra, `600 ${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
+        this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `600 ${13.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
       } else {
         // Level 2: tinted background with colored border
         ctx.shadowColor = 'rgba(0,0,0,0.06)';
@@ -1708,14 +1848,14 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
         ctx.shadowColor = 'transparent';
         ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.5);
-        ctx.lineWidth = 2.5 * scale;
+        ctx.lineWidth = 2 * scale;
         ctx.stroke();
 
-        this._drawTextToCanvas(ctx, node.text, x + 10 * scale, y + h / 2, w - 20 * scale - badgeExtra, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
+        this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `600 ${13.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
       }
     } else {
       if (isBorderless) {
-        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
+        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `500 ${12.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
       } else {
         // Level 3+: subtle border
         if (isDoodle) {
@@ -1727,17 +1867,17 @@ class LightMindMapPlugin extends obsidian.Plugin {
         ctx.fill();
 
         ctx.strokeStyle = this._mixColors(node.color, bgColor, 0.6);
-        ctx.lineWidth = 2 * scale;
+        ctx.lineWidth = 1.5 * scale;
         ctx.stroke();
 
-        this._drawTextToCanvas(ctx, node.text, x + 8 * scale, y + h / 2, w - 16 * scale - badgeExtra, `${13 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`, isDark ? '#E2E8F0' : '#1F2937');
+        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `500 ${12.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
       }
     }
 
     // Draw collapse badge
     if (collapsed) {
       const badgeR = 9 * scale;
-      const padRight = depth === 0 ? 14 : depth === 1 ? 12 : depth === 2 ? 10 : 8;
+      const padRight = depth === 0 ? 26 : depth === 1 ? 18 : depth === 2 ? 14 : 12;
       const badgeCX = x + w - padRight * scale - badgeR;
       const badgeCY = y + h / 2;
 
@@ -1766,15 +1906,27 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const style = LINE_STYLES[lineStyle] || LINE_STYLES[DEFAULT_LINE];
 
     for (const child of node.children) {
-      let parentLeft;
-      if (layout === 'balanced') parentLeft = child._side === 'right';
-      else if (layout === 'left') parentLeft = false;
-      else parentLeft = true;
-
-      const startX = (parentLeft ? node.x + node.width : node.x) * scale;
-      const startY = (node.y + node.height / 2) * scale;
-      const endX = (parentLeft ? child.x : child.x + child.width) * scale;
-      const endY = (child.y + child.height / 2) * scale;
+      let startX, startY, endX, endY;
+      if (layout === 'radial') {
+        startX = (node.x + node.width / 2) * scale;
+        startY = (node.y + node.height / 2) * scale;
+        endX = (child.x + child.width / 2) * scale;
+        endY = (child.y + child.height / 2) * scale;
+      } else if (layout === 'tree') {
+        startX = (node.x + node.width / 2) * scale;
+        startY = (node.y + node.height) * scale;
+        endX = (child.x + child.width / 2) * scale;
+        endY = child.y * scale;
+      } else {
+        let parentLeft;
+        if (layout === 'balanced') parentLeft = child._side === 'right';
+        else if (layout === 'left') parentLeft = false;
+        else parentLeft = true;
+        startX = (parentLeft ? node.x + node.width : node.x) * scale;
+        startY = (node.y + node.height / 2) * scale;
+        endX = (parentLeft ? child.x : child.x + child.width) * scale;
+        endY = (child.y + child.height / 2) * scale;
+      }
 
       ctx.save();
       ctx.strokeStyle = child.color;
@@ -1793,14 +1945,37 @@ class LightMindMapPlugin extends obsidian.Plugin {
       if (style.shape === 'straight') {
         ctx.lineTo(endX, endY);
       } else if (style.shape === 'polyline') {
-        const midX = startX + (endX - startX) / 2;
-        ctx.lineTo(midX, startY);
-        ctx.lineTo(midX, endY);
-        ctx.lineTo(endX, endY);
+        if (layout === 'tree') {
+          const midY = startY + (endY - startY) / 2;
+          ctx.lineTo(startX, midY);
+          ctx.lineTo(endX, midY);
+          ctx.lineTo(endX, endY);
+        } else if (layout === 'radial') {
+          ctx.lineTo(endX, endY);
+        } else {
+          const midX = startX + (endX - startX) / 2;
+          ctx.lineTo(midX, startY);
+          ctx.lineTo(midX, endY);
+          ctx.lineTo(endX, endY);
+        }
       } else {
-        // curve
-        const dx = (endX - startX) * 0.5;
-        ctx.bezierCurveTo(startX + dx, startY, endX - dx, endY, endX, endY);
+        if (layout === 'tree') {
+          const dy = (endY - startY) * 0.4;
+          ctx.bezierCurveTo(startX, startY + dy, endX, endY - dy, endX, endY);
+        } else if (layout === 'radial') {
+          const dx = endX - startX;
+          const dy = endY - startY;
+          const dist = Math.sqrt(dx * dx + dy * dy) * 0.35;
+          const angle = Math.atan2(dy, dx);
+          const cx1 = startX + dist * Math.cos(angle);
+          const cy1 = startY + dist * Math.sin(angle);
+          const cx2 = endX - dist * Math.cos(angle);
+          const cy2 = endY - dist * Math.sin(angle);
+          ctx.bezierCurveTo(cx1, cy1, cx2, cy2, endX, endY);
+        } else {
+          const dx = (endX - startX) * 0.5;
+          ctx.bezierCurveTo(startX + dx, startY, endX - dx, endY, endX, endY);
+        }
       }
 
       ctx.stroke();
