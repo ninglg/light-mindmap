@@ -134,6 +134,29 @@ class LightMindMapPlugin extends obsidian.Plugin {
       }
     });
 
+    // Right-click menu: create new mindmap file in folder
+    this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
+      if (!(file instanceof obsidian.TFolder)) return;
+      menu.addItem((item) => {
+        const lang = window.localStorage.getItem('language') || 'en';
+        const title = lang.startsWith('zh') ? '新建轻量级脑图' : 'Create light mindmap';
+        item
+          .setTitle(title)
+          .setIcon('brain')
+          .onClick(async () => {
+            const base = 'New Mindmap';
+            let name = base + '.md';
+            let i = 1;
+            while (this.app.vault.getAbstractFileByPath(file.path + '/' + name)) {
+              name = base + ' ' + (++i) + '.md';
+            }
+            const content = '---\ntype: mindmap\n---\n\n# New\n';
+            const created = await this.app.vault.create(file.path + '/' + name, content);
+            await this.app.workspace.openLinkText(created.path, '', true);
+          });
+      });
+    }));
+
     this.app.workspace.onLayoutReady(() => this._doScan());
 
     // Inject SVG filter for doodle node style
@@ -784,9 +807,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
           const text = el.textContent;
           this._exitEditMode(overlay, node);
           this._updateNodeText(node, text);
-          if (node.depth !== 0) {
-            this._addSibling(overlay, node, true);
-          } else if (node.dirty) {
+          if (node.dirty) {
             this._persistAndRelayout(overlay);
           }
         } else if (e.key === 'Tab') {
