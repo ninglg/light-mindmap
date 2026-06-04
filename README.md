@@ -51,13 +51,15 @@ The mind map updates in real time as you edit the source.
 
 ### Layouts
 
-Three layout modes, switchable from the toolbar or via command:
+Five layout modes, switchable from the toolbar dropdown or via command:
 
-| Layout       | Description                                                                    |
-| ------------ | ------------------------------------------------------------------------------ |
-| **Balanced** | Children are distributed to both sides of the root, weighted by subtree height |
-| **Right**    | All branches expand to the right                                               |
-| **Left**     | All branches expand to the left                                                |
+| Layout           | Description                                                                    |
+| ---------------- | ------------------------------------------------------------------------------ |
+| **Balanced**     | Children are distributed to both sides of the root, weighted by subtree height |
+| **Right**        | All branches expand to the right                                               |
+| **Left**         | All branches expand to the left                                                |
+| **Tree**         | Top-down tree — root at the top, branches expand downward                      |
+| **Radial**       | Root at the center, branches radiate outward in a circle                       |
 
 ### Themes
 
@@ -111,7 +113,7 @@ Nodes can be edited directly on the canvas — changes are written back to the m
 | ----------------------------- | ---------------------------------------------- |
 | Select node                   | Click                                          |
 | Edit node text                | Double-click or **F2**                         |
-| Confirm edit + add sibling    | **Enter**                                      |
+| Confirm edit                  | **Enter**                                      |
 | Confirm edit + add child      | **Tab**                                        |
 | Cancel edit                   | **Escape**                                     |
 | Add sibling (without editing) | Select node, press **Enter**                   |
@@ -131,7 +133,7 @@ All per-file display preferences are written to frontmatter and restored on next
 
 | Frontmatter key  | Values                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
-| `mindmap-layout` | `balanced` / `right` / `left`                                          |
+| `mindmap-layout` | `balanced` / `right` / `left` / `tree` / `radial`                      |
 | `mindmap-theme`  | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight` / `slate` |
 | `mindmap-line`   | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed` |
 | `mindmap-node`   | `rounded` / `square` / `borderless` / `circle` / `doodle`              |
@@ -141,7 +143,7 @@ All per-file display preferences are written to frontmatter and restored on next
 - **Edit Markdown** button in the toolbar hides the mind map and shows a floating **Light Mindmap** button
 - Returning from source view auto-fits the mindmap to the viewport
 - Command palette: **Toggle mindmap / source view**
-- Command palette: **Cycle mindmap layout (balanced / right / left)**
+- Command palette: **Cycle mindmap layout (balanced / right / left / tree / radial)**
 
 ### External Links
 

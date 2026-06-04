@@ -52,13 +52,15 @@ type: mindmap
 
 ### 布局模式
 
-三种布局，可通过工具栏或命令切换：
+五种布局，可通过工具栏下拉菜单或命令切换：
 
-| 布局     | 说明                             |
-| -------- | -------------------------------- |
-| **均衡** | 子节点分布于根节点两侧，按子树高度加权分配 |
-| **向右** | 所有分支向右展开                 |
-| **向左** | 所有分支向左展开                 |
+| 布局       | 说明                                           |
+| ---------- | ---------------------------------------------- |
+| **均衡**   | 子节点分布于根节点两侧，按子树高度加权分配     |
+| **向右**   | 所有分支向右展开                               |
+| **向左**   | 所有分支向左展开                               |
+| **树形**   | 自上而下树状布局，根节点在顶部，分支向下展开   |
+| **放射**   | 根节点居中，分支沿圆周向外辐射                 |
 
 ### 主题
 
@@ -112,7 +114,7 @@ type: mindmap
 | -------------------------- | --------------------------------------- |
 | 选中节点                   | 单击                                    |
 | 编辑节点文字               | 双击或按 **F2**                         |
-| 确认编辑并添加同级节点     | **Enter**                               |
+| 确认编辑                   | **Enter**                               |
 | 确认编辑并添加子节点       | **Tab**                                 |
 | 取消编辑                   | **Escape**                              |
 | 添加同级节点（无需编辑）   | 选中节点后按 **Enter**                  |
@@ -132,7 +134,7 @@ type: mindmap
 
 | Frontmatter 字段   | 可选值                                                                     |
 | ------------------ | -------------------------------------------------------------------------- |
-| `mindmap-layout`   | `balanced` / `right` / `left`                                              |
+| `mindmap-layout`   | `balanced` / `right` / `left` / `tree` / `radial`                          |
 | `mindmap-theme`    | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight` / `slate`|
 | `mindmap-line`     | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed`     |
 | `mindmap-node`     | `rounded` / `square` / `borderless` / `circle` / `doodle`                  |
@@ -142,7 +144,7 @@ type: mindmap
 - 工具栏中的 **Edit Markdown** 按钮可隐藏思维导图并显示浮动的 **Light Mindmap** 按钮
 - 从源码视图返回时会自动适配导图到视窗
 - 命令面板：**Toggle mindmap / source view**
-- 命令面板：**Cycle mindmap layout (balanced / right / left)**
+- 命令面板：**Cycle mindmap layout (balanced / right / left / tree / radial)**
 
 ### 外部链接
 
