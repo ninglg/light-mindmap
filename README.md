@@ -5,9 +5,7 @@
 Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.
 
 ## Preview
-![Light MindMap Preview 1](screenshot1.png)
-![Light MindMap Preview 2](screenshot2.png)
-![Light MindMap Preview 3](screenshot3.png)
+![Light MindMap Preview](preview.png)
 
 ## How It Works
 

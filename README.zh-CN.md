@@ -6,9 +6,7 @@
 
 ## 预览
 
-![Light MindMap 预览 1](screenshot1.png)
-![Light MindMap 预览 2](screenshot2.png)
-![Light MindMap 预览 3](screenshot3.png)
+![Light MindMap 预览](preview.png)
 
 ## 使用方法
 
