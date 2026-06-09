@@ -1,6 +1,6 @@
 # Light Mindmap
 
-**English** | [简体中文](#预览)
+**English** | [简体中文](#License)
 
 Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.
 
