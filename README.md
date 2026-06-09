@@ -1,6 +1,6 @@
 # Light Mindmap
 
-**English** | [简体中文](#light-mindmap-1)
+**English** | [简体中文](#light-mindmap_1)
 
 Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.
 
@@ -189,7 +189,7 @@ MIT
 
 ---
 
-# Light Mindmap
+# Light Mindmap 简体中文
 
 [English](#light-mindmap) | **简体中文**
 
