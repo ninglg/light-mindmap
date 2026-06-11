@@ -11,6 +11,8 @@ Auto-renders markdown headings as a colorful, interactive mindmap — no extra s
 
 Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/reading view with a live mind map built from the note's heading hierarchy.
 
+You can also right-click a folder in the file explorer and select **Create light mindmap** to quickly create a new mindmap file in that folder.
+
 ```yaml
 ---
 type: mindmap
@@ -200,6 +202,8 @@ MIT
 ## 使用方法
 
 在笔记的 frontmatter 中添加 `type: mindmap`，插件会自动将编辑/阅读视图替换为实时思维导图，导图内容来自笔记的标题层级。
+
+也可以在文件资源管理器中右键点击**文件夹**，选择 **新建轻量级脑图**，快速在该文件夹下创建一个新的脑图文件。
 
 ```yaml
 ---
