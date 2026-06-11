@@ -120,12 +120,27 @@ Nodes can be edited directly on the canvas — changes are written back to the m
 | Add child (without editing)   | Select node, press **Tab**                     |
 | Delete node                   | Select node, press **Delete** or **Backspace** |
 | Collapse / expand node        | Select node, press **Space**                   |
+| Right-click context menu      | Right-click on node                            |
 
 - The root node cannot be deleted.
 - Pressing **Enter** on the root node has no effect (no sibling can be added above root).
 - Pressing **Tab** on a collapsed node auto-expands it and adds a new child.
 - Double-clicking or pressing **F2** on a collapsed node auto-expands it and enters edit mode.
 - Collapsed nodes display a **+** badge after the text. The badge is also rendered in exported PNGs.
+
+### Right-Click Context Menu
+
+Right-click on any node to open the context menu with quick actions:
+
+| Action           | Description                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| **Edit**         | Enter edit mode for the node                                |
+| **Add Sibling**  | Insert a sibling node (not available on root)               |
+| **Add Child**    | Create a child node (auto-expands if collapsed)             |
+| **Collapse**     | Toggle collapsed state (only for nodes with children)       |
+| **Delete**       | Delete the node (not available on root)                     |
+
+The context menu automatically displays in Chinese or English based on Obsidian's language setting.
 
 ### Persisted Settings
 
@@ -312,12 +327,27 @@ type: mindmap
 | 添加子节点（无需编辑）     | 选中节点后按 **Tab**                    |
 | 删除节点                   | 选中节点后按 **Delete** 或 **Backspace**|
 | 折叠/展开节点              | 选中节点后按 **Space**                  |
+| 右键上下文菜单             | 右键点击节点                            |
 
 - 根节点不可删除。
 - 在根节点上按 **Enter** 无效（根节点上方无法添加同级节点）。
 - 在已折叠节点上按 **Tab** 会自动展开并添加子节点。
 - 双击或按 **F2** 已折叠节点会自动展开并进入编辑模式。
 - 已折叠节点的文字后会显示 **+** 标记，导出 PNG 时也会保留该标记。
+
+### 右键上下文菜单
+
+右键点击任意节点可打开上下文菜单，提供快捷操作：
+
+| 操作             | 说明                                                    |
+| ---------------- | ------------------------------------------------------- |
+| **编辑**         | 进入节点编辑模式                                        |
+| **创建同级节点** | 在当前节点同级插入新节点（根节点不可用）                |
+| **创建下级节点** | 创建子节点（已折叠时自动展开）                          |
+| **折叠/展开**    | 切换折叠状态（仅对有子节点的节点可用）                  |
+| **删除**         | 删除节点（根节点不可用）                                |
+
+上下文菜单会根据 Obsidian 的语言设置自动显示中文或英文。
 
 ### 持久化设置
 
