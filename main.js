@@ -802,6 +802,9 @@ class LightMindMapPlugin extends obsidian.Plugin {
       e.preventDefault();
       this._startEdit(overlay, node);
     });
+    el.addEventListener('contextmenu', (e) => {
+      this._showNodeContextMenu(overlay, node, e);
+    });
     el.addEventListener('keydown', (e) => {
       if (el.isContentEditable) {
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -1010,12 +1013,70 @@ class LightMindMapPlugin extends obsidian.Plugin {
     this._persistAndRelayout(overlay);
   }
 
+  _isZh() {
+    return (window.localStorage.getItem('language') || 'en').startsWith('zh');
+  }
+
+  _showNodeContextMenu(overlay, node, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (node.isVirtual) return;
+
+    const zh = this._isZh();
+    const menu = new obsidian.Menu();
+
+    menu.addItem((item) => {
+      item.setTitle(zh ? '编辑' : 'Edit')
+        .setIcon('pencil')
+        .onClick(() => this._startEdit(overlay, node));
+    });
+
+    if (node.depth !== 0) {
+      menu.addItem((item) => {
+        item.setTitle(zh ? '创建同级节点' : 'Add Sibling')
+          .setIcon('plus')
+          .onClick(() => this._addSibling(overlay, node, true));
+      });
+    }
+
+    menu.addItem((item) => {
+      item.setTitle(zh ? '创建下级节点' : 'Add Child')
+        .setIcon('git-branch')
+        .onClick(() => {
+          if (node.collapsed && node.children && node.children.length) {
+            node.collapsed = false;
+          }
+          this._addChild(overlay, node, true);
+        });
+    });
+
+    if (node.children && node.children.length) {
+      const collapsed = node.collapsed;
+      menu.addItem((item) => {
+        item.setTitle(zh ? (collapsed ? '展开' : '折叠') : (collapsed ? 'Expand' : 'Collapse'))
+          .setIcon(collapsed ? 'chevrons-down' : 'chevrons-up')
+          .onClick(() => this._toggleCollapse(overlay, node));
+      });
+    }
+
+    if (node.parent) {
+      menu.addSeparator();
+      menu.addItem((item) => {
+        item.setTitle(zh ? '删除' : 'Delete')
+          .setIcon('trash')
+          .onClick(() => this._deleteNode(overlay, node));
+      });
+    }
+
+    menu.showAtMouseEvent(e);
+  }
+
   _deleteNode(overlay, node) {
     const treeInfo = overlay._lmmTreeInfo;
     if (!node) return;
     if (node.isVirtual) return;
     if (!node.parent) {
-      new obsidian.Notice('Cannot delete the root node');
+      new obsidian.Notice(this._isZh() ? '无法删除根节点' : 'Cannot delete the root node');
       return;
     }
     const parent = node.parent;

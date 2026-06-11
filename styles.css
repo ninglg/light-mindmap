@@ -581,3 +581,52 @@
   text-decoration: none;
   pointer-events: none;
 }
+
+/* Node context menu */
+.lmm-overlay .menu {
+  z-index: 100;
+  min-width: 180px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--background-modifier-border);
+  padding: 4px 0;
+}
+
+.lmm-overlay .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+  border-radius: 0;
+}
+
+.lmm-overlay .menu-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.lmm-overlay .menu-item-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.lmm-overlay .menu-item-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.lmm-overlay .menu-separator {
+  margin: 4px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
