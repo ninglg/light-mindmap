@@ -260,26 +260,62 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _renderNodeContent(el, node, overlay) {
     const raw = node.rawText || node.text || '';
-    if (!raw.includes('](')) {
+    if (!raw.includes('](') && !raw.includes('[[')) {
       el.textContent = node.text || PLACEHOLDER;
       return;
     }
     el.textContent = '';
-    const re = /\[([^\]]+)\]\(([^)]+)\)/g;
-    let last = 0;
+    const sourcePath = overlay._lmmFile ? overlay._lmmFile.path : '';
+    const dir = sourcePath ? sourcePath.substring(0, sourcePath.lastIndexOf('/')) : '';
+
+    // Collect all links (markdown and wiki-link) with positions
+    const links = [];
     let m;
-    while ((m = re.exec(raw)) !== null) {
-      if (m.index > last) {
-        el.appendChild(document.createTextNode(raw.slice(last, m.index)));
-      }
+    const mdRe = /\[([^\]]*)\]\(([^)]*)\)/g;
+    while ((m = mdRe.exec(raw)) !== null) {
+      links.push({ start: m.index, end: m.index + m[0].length, type: 'md', text: m[1], target: m[2] });
+    }
+    const wikiRe = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+    while ((m = wikiRe.exec(raw)) !== null) {
+      links.push({ start: m.index, end: m.index + m[0].length, type: 'wiki', target: m[1], text: m[2] || m[1] });
+    }
+    links.sort((a, b) => a.start - b.start);
+
+    let last = 0;
+    for (const link of links) {
+      if (link.start < last) continue; // skip overlapping
+      if (link.start > last) el.appendChild(document.createTextNode(raw.slice(last, link.start)));
+
       const a = document.createElement('a');
       a.className = 'lmm-link';
-      a.textContent = m[1];
-      a.href = m[2];
-      a.target = '_blank';
-      a.rel = 'noopener';
+      a.textContent = link.text;
+
+      if (link.type === 'md') {
+        const href = link.target;
+        a.href = href;
+        const isExternal = /^https?:\/\//.test(href) || href.startsWith('obsidian://');
+        if (isExternal) {
+          a.target = '_blank';
+          a.rel = 'noopener';
+        } else {
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const fp = obsidian.normalizePath(dir ? dir + '/' + href : href);
+            this.app.workspace.openLinkText(fp, '', 'tab');
+          });
+        }
+      } else {
+        // wiki-link: Obsidian API resolves shortest/relative paths natively
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.app.workspace.openLinkText(link.target, sourcePath, 'tab');
+        });
+      }
+
       el.appendChild(a);
-      last = m.index + m[0].length;
+      last = link.end;
     }
     if (last < raw.length) {
       el.appendChild(document.createTextNode(raw.slice(last)));
@@ -313,7 +349,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
         headings.push({
           srcIdx: i,
           level: m[1].length,
-          rawText,
+          rawText: collapsed ? rawText.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1') : rawText,
           text: this._stripInline(rawText),
           children: [],
           parent: null,
@@ -807,6 +843,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     });
     el.addEventListener('keydown', (e) => {
       if (el.isContentEditable) {
+        if (overlay._lmmMention && this._handleMentionKeydown(overlay, e)) return;
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
           e.preventDefault();
           const text = el.textContent;
@@ -899,14 +936,23 @@ class LightMindMapPlugin extends obsidian.Plugin {
     };
     el.addEventListener('blur', onBlur);
     overlay._lmmEditingBlur = onBlur;
+
+    const onInput = () => this._updateMentionPopup(overlay);
+    el.addEventListener('input', onInput);
+    overlay._lmmMentionInput = onInput;
   }
 
   _exitEditMode(overlay, node) {
     const el = node._el;
     if (!el) return;
+    this._closeMentionPopup(overlay);
     if (overlay._lmmEditingBlur) {
       el.removeEventListener('blur', overlay._lmmEditingBlur);
       overlay._lmmEditingBlur = null;
+    }
+    if (overlay._lmmMentionInput) {
+      el.removeEventListener('input', overlay._lmmMentionInput);
+      overlay._lmmMentionInput = null;
     }
     el.contentEditable = 'false';
     el.classList.remove('lmm-editing');
@@ -927,6 +973,140 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _cancelEdit(overlay, node) {
     this._exitEditMode(overlay, node);
+  }
+
+  // ─── Wiki-link mention autocomplete ────────────────────────────
+
+  _getMentionQuery(el) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return null;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return null;
+    const textNode = range.startContainer;
+    if (textNode.nodeType !== Node.TEXT_NODE) return null;
+    const offset = range.startOffset;
+    const text = textNode.textContent;
+    const before = text.slice(0, offset);
+    const openIdx = before.lastIndexOf('[[');
+    if (openIdx === -1) return null;
+    const after = text.slice(offset);
+    if (after.includes(']]')) return null;
+    return { query: before.slice(openIdx + 2), openIdx, textNode, sel };
+  }
+
+  _renderMentionPopup(overlay, items) {
+    this._closeMentionPopup(overlay);
+    const popup = document.createElement('div');
+    popup.className = 'lmm-mention-popup';
+    items.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'lmm-mention-item';
+      if (i === 0) row.classList.add('lmm-mention-active');
+      row.textContent = item.basename;
+      row.title = item.path;
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this._insertMention(overlay, item);
+      });
+      popup.appendChild(row);
+    });
+    overlay.appendChild(popup);
+
+    const node = overlay._lmmEditingNode;
+    if (node && node._el) {
+      const rect = node._el.getBoundingClientRect();
+      popup.style.left = rect.left + 'px';
+      popup.style.top = rect.bottom + 4 + 'px';
+    }
+    overlay._lmmMention = { popup, index: 0, items };
+  }
+
+  _closeMentionPopup(overlay) {
+    if (overlay._lmmMention) {
+      overlay._lmmMention.popup.remove();
+      overlay._lmmMention = null;
+    }
+  }
+
+  _updateMentionPopup(overlay) {
+    const el = overlay._lmmEditingNode && overlay._lmmEditingNode._el;
+    if (!el || !el.isContentEditable) return;
+    const info = this._getMentionQuery(el);
+    if (!info) { this._closeMentionPopup(overlay); return; }
+
+    const files = this.app.vault.getMarkdownFiles();
+    const q = info.query.toLowerCase();
+    let matches;
+    if (q) {
+      matches = files.filter(f => f.basename.toLowerCase().includes(q));
+    } else {
+      matches = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
+    }
+    if (matches.length === 0) { this._closeMentionPopup(overlay); return; }
+
+    this._renderMentionPopup(overlay, matches);
+  }
+
+  _insertMention(overlay, file) {
+    const node = overlay._lmmEditingNode;
+    if (!node || !node._el) return;
+    const el = node._el;
+    const info = this._getMentionQuery(el);
+    if (!info) { this._closeMentionPopup(overlay); return; }
+
+    // Rebuild text: everything before [[ + query, then insert [[name]], then rest
+    const fullText = el.textContent;
+    const beforeQuery = fullText.slice(0, info.openIdx);
+    const queryEnd = info.openIdx + 2 + info.query.length;
+    const afterQuery = fullText.slice(queryEnd);
+    const insert = '[[' + file.basename + ']]';
+    el.textContent = beforeQuery + insert + afterQuery;
+
+    // Place cursor after the inserted link
+    const pos = beforeQuery.length + insert.length;
+    const range = document.createRange();
+    const textNode = el.firstChild;
+    if (textNode) {
+      range.setStart(textNode, Math.min(pos, textNode.textContent.length));
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    this._closeMentionPopup(overlay);
+    el.focus();
+  }
+
+  _handleMentionKeydown(overlay, e) {
+    const m = overlay._lmmMention;
+    if (!m) return false;
+    const items = m.items;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      m.index = (m.index + 1) % items.length;
+      this._highlightMention(m);
+      return true;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      m.index = (m.index - 1 + items.length) % items.length;
+      this._highlightMention(m);
+      return true;
+    } else if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      this._insertMention(overlay, items[m.index]);
+      return true;
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      this._closeMentionPopup(overlay);
+      return true;
+    }
+    return false;
+  }
+
+  _highlightMention(m) {
+    const rows = m.popup.querySelectorAll('.lmm-mention-item');
+    rows.forEach((r, i) => r.classList.toggle('lmm-mention-active', i === m.index));
+    rows[m.index] && rows[m.index].scrollIntoView({ block: 'nearest' });
   }
 
   _toggleCollapse(overlay, node) {

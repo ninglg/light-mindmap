@@ -303,6 +303,40 @@
   caret-color: #fff;
 }
 
+/* Mention autocomplete popup */
+.lmm-mention-popup {
+  position: fixed;
+  z-index: 100;
+  min-width: 180px;
+  max-width: 320px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, rgba(0,0,0,0.1));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 4px 0;
+}
+.lmm-mention-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-normal, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lmm-mention-item:hover,
+.lmm-mention-item.lmm-mention-active {
+  background: var(--background-modifier-hover, rgba(0,0,0,0.06));
+}
+.lmm-mention-item.lmm-mention-active {
+  background: var(--interactive-accent, #6366F1);
+  color: #fff;
+}
+
 /* Root: bold gradient capsule with glow */
 .lmm-node-root,
 .lmm-node-d0 {
