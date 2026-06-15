@@ -46,18 +46,10 @@ gh release create X.Y.Z \
 - **Feature Name**: Description
 - **Bug Fix**: Description
 
-## Breaking Changes
-
-- None (describe if any)
-
 ## 更新内容
 
 - **功能名称**：描述
 - **Bug 修复**：描述
-
-## 破坏性变更
-
-- 无（如有则在此描述）
 ```
 
 ## 注意事项
