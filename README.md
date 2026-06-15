@@ -160,9 +160,15 @@ All per-file display preferences are written to frontmatter and restored on next
 - Command palette: **Toggle mindmap / source view**
 - Command palette: **Cycle mindmap layout (balanced / right / left / tree / radial)**
 
-### External Links
+### Links & Wiki-links
 
-Markdown links in heading text (`[text](url)`) are rendered as clickable links directly on the mindmap canvas. Clicking a link opens it in the default browser. During node editing, links are shown as plain text for easy modification.
+Markdown links (`[text](url)`) and wiki-links (`[[Note]]`, `[[Note|Alias]]`) in heading text are rendered as clickable links on the mindmap canvas.
+
+- **External links** (`http://...`) open in the default browser
+- **Internal links** (relative paths like `./note.md`) open in a new Obsidian tab
+- **Wiki-links** (`[[Note]]`) open the target note in a new Obsidian tab — supports shortest paths, relative paths, and aliases natively
+
+During node editing, typing `[[` triggers an autocomplete popup that searches all vault notes. Use **↑↓** to navigate, **Enter** to insert, **Escape** to dismiss. Links are shown as plain text while editing for easy modification.
 
 ### Export PNG
 
@@ -367,9 +373,15 @@ type: mindmap
 - 命令面板：**Toggle mindmap / source view**
 - 命令面板：**Cycle mindmap layout (balanced / right / left / tree / radial)**
 
-### 外部链接
+### 链接与双向链接
 
-标题中的 Markdown 链接（`[文本](url)`）会直接在思维导图画布上渲染为可点击的链接。点击链接会在默认浏览器中打开。编辑节点时，链接会显示为纯文本以便修改。
+标题中的 Markdown 链接（`[文本](url)`）和 Wiki 链接（`[[笔记]]`、`[[笔记|别名]]`）会直接在思维导图画布上渲染为可点击的链接。
+
+- **外部链接**（`http://...`）在默认浏览器中打开
+- **内部链接**（相对路径如 `./note.md`）在新的 Obsidian 标签页中打开
+- **Wiki 链接**（`[[笔记]]`）在新的 Obsidian 标签页中打开目标笔记——原生支持最短路径、相对路径和别名
+
+编辑节点时，输入 `[[` 会触发自动补全弹窗，搜索所有 vault 笔记。使用 **↑↓** 导航、**Enter** 插入、**Escape** 关闭。编辑模式下链接显示为纯文本以便修改。
 
 ### 导出 PNG
 
