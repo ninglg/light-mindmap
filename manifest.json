@@ -3,7 +3,7 @@
   "name": "Light Mindmap",
   "version": "1.4.0",
   "minAppVersion": "1.4.0",
-  "description": "Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.",
+  "description": "Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain markdown headings, no custom syntax needed.",
   "author": "Light Ning",
   "authorUrl": "https://github.com/ninglg",
   "isDesktopOnly": false

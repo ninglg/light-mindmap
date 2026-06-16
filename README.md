@@ -2,7 +2,7 @@
 
 **English** | [简体中文](#License)
 
-Auto-renders markdown headings as a colorful, interactive mindmap — no extra syntax required.
+Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain markdown headings, no custom syntax needed.
 
 ## Preview
 ![Light MindMap Preview](preview.png)
@@ -214,7 +214,7 @@ MIT
 
 [English](#light-mindmap) | **简体中文**
 
-自动将 Markdown 标题渲染为色彩丰富、可交互的思维导图——无需额外语法。
+功能丰富的思维导图插件——多种布局、主题、节点形状与连线样式，支持双向链接、节点折叠、PNG 导出——基于纯 Markdown 标题渲染，无需任何自定义语法。
 
 ## 预览
 

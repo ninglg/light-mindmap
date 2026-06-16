@@ -92,6 +92,8 @@ const PLACEHOLDER = 'New Title';
 class LightMindMapPlugin extends obsidian.Plugin {
   async onload() {
     this._scan = obsidian.debounce(() => this._doScan(), 120);
+    this._fileCache = null;
+    this._fileCacheTime = 0;
 
     this.registerEvent(this.app.workspace.on('file-open', () => this._scan()));
     this.registerEvent(this.app.workspace.on('active-leaf-change', () => this._scan()));
@@ -1034,13 +1036,18 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const info = this._getMentionQuery(el);
     if (!info) { this._closeMentionPopup(overlay); return; }
 
-    const files = this.app.vault.getMarkdownFiles();
+    const now = Date.now();
+    if (!this._fileCache || now - this._fileCacheTime > 5000) {
+      this._fileCache = this.app.vault.getMarkdownFiles();
+      this._fileCacheTime = now;
+    }
+    const files = this._fileCache;
     const q = info.query.toLowerCase();
     let matches;
     if (q) {
-      matches = files.filter(f => f.basename.toLowerCase().includes(q));
+      matches = files.filter(f => f.basename.toLowerCase().includes(q)).slice(0, 30);
     } else {
-      matches = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
+      matches = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime).slice(0, 30);
     }
     if (matches.length === 0) { this._closeMentionPopup(overlay); return; }
 
@@ -2229,6 +2236,13 @@ class LightMindMapPlugin extends obsidian.Plugin {
   async _saveWithDialog(file, arrayBuffer) {
     const uint8 = new Uint8Array(arrayBuffer);
     const defaultName = (file.basename || 'mindmap') + '.mindmap.png';
+    
+    if (this.app.isMobile) {
+      const filePath = (file.parent ? file.parent.path + '/' : '') + defaultName;
+      await this.app.vault.adapter.writeBinary(filePath, uint8);
+      return true;
+    }
+    
     try {
       const electron = require('electron');
       const win = electron.remote.BrowserWindow.getFocusedWindow();
@@ -2241,7 +2255,6 @@ class LightMindMapPlugin extends obsidian.Plugin {
       require('fs').writeFileSync(result.filePath, Buffer.from(arrayBuffer));
       return true;
     } catch (e) {
-      // Fallback: save directly into vault
       const filePath = (file.parent ? file.parent.path + '/' : '') + defaultName;
       await this.app.vault.adapter.writeBinary(filePath, uint8);
       return true;
