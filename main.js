@@ -1012,7 +1012,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
       });
       popup.appendChild(row);
     });
-    overlay.appendChild(popup);
+    document.body.appendChild(popup);
 
     const node = overlay._lmmEditingNode;
     if (node && node._el) {

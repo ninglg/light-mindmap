@@ -1,7 +1,7 @@
 {
   "id": "light-mindmap",
   "name": "Light Mindmap",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "minAppVersion": "1.4.0",
   "description": "Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain markdown headings, no custom syntax needed.",
   "author": "Light Ning",
