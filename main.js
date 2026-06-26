@@ -101,6 +101,16 @@ class LightMindMapPlugin extends obsidian.Plugin {
     this.registerEvent(this.app.workspace.on('editor-change', () => this._scan()));
     this.registerEvent(this.app.metadataCache.on('changed', () => this._scan()));
 
+    this.addRibbonIcon('brain', 'Convert current note to mindmap', () => {
+      void this._convertActiveFileToMindmap();
+    });
+
+    this.addCommand({
+      id: 'lmm-convert-current-note',
+      name: 'Convert current note to mindmap',
+      callback: () => void this._convertActiveFileToMindmap()
+    });
+
     this.addCommand({
       id: 'lmm-toggle-source',
       name: 'Toggle mindmap / source view',
@@ -138,31 +148,70 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
     // Right-click menu: create new mindmap file in folder
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
-      if (!(file instanceof obsidian.TFolder)) return;
-      menu.addItem((item) => {
-        const lang = window.localStorage.getItem('language') || 'en';
-        const title = lang.startsWith('zh') ? '新建轻量级脑图' : 'Create light mindmap';
-        item
-          .setTitle(title)
-          .setIcon('brain')
-          .onClick(async () => {
-            const base = 'New Mindmap';
-            let name = base + '.md';
-            let i = 1;
-            while (this.app.vault.getAbstractFileByPath(file.path + '/' + name)) {
-              name = base + ' ' + (++i) + '.md';
-            }
-            const content = '---\ntype: mindmap\n---\n\n# New\n';
-            const created = await this.app.vault.create(file.path + '/' + name, content);
-            await this.app.workspace.openLinkText(created.path, '', true);
-          });
-      });
+      const lang = window.localStorage.getItem('language') || 'en';
+      if (file instanceof obsidian.TFolder) {
+        menu.addItem((item) => {
+          const title = lang.startsWith('zh') ? '新建轻量级脑图' : 'Create light mindmap';
+          item
+            .setTitle(title)
+            .setIcon('brain')
+            .onClick(async () => {
+              const base = 'New Mindmap';
+              let name = base + '.md';
+              let i = 1;
+              while (this.app.vault.getAbstractFileByPath(file.path + '/' + name)) {
+                name = base + ' ' + (++i) + '.md';
+              }
+              const content = '---\ntype: mindmap\n---\n\n# New\n';
+              const created = await this.app.vault.create(file.path + '/' + name, content);
+              await this.app.workspace.openLinkText(created.path, '', true);
+            });
+        });
+      } else if (file instanceof obsidian.TFile && file.extension === 'md') {
+        menu.addItem((item) => {
+          const title = lang.startsWith('zh') ? '转换为轻量级脑图' : 'Convert to light mindmap';
+          item
+            .setTitle(title)
+            .setIcon('brain')
+            .onClick(() => void this._convertFileToMindmap(file, true));
+        });
+      }
     }));
 
     this.app.workspace.onLayoutReady(() => this._doScan());
 
     // Inject SVG filter for doodle node style
     this._injectDoodleFilter();
+  }
+
+  async _convertActiveFileToMindmap() {
+    const file = this.app.workspace.getActiveFile();
+    if (!(file instanceof obsidian.TFile) || file.extension !== 'md') {
+      new obsidian.Notice('Open a Markdown note before converting it to a mindmap.');
+      return;
+    }
+    await this._convertFileToMindmap(file, false);
+  }
+
+  async _convertFileToMindmap(file, openAfter) {
+    if (!(file instanceof obsidian.TFile) || file.extension !== 'md') return;
+    try {
+      await this.app.fileManager.processFrontMatter(file, (fm) => {
+        fm.type = 'mindmap';
+        if (!fm['mindmap-layout']) fm['mindmap-layout'] = 'balanced';
+        if (!fm['mindmap-theme']) fm['mindmap-theme'] = DEFAULT_THEME;
+        if (!fm['mindmap-line']) fm['mindmap-line'] = DEFAULT_LINE;
+        if (!fm['mindmap-node']) fm['mindmap-node'] = DEFAULT_NODE_STYLE;
+      });
+      if (openAfter) {
+        await this.app.workspace.openLinkText(file.path, '', true);
+      }
+      new obsidian.Notice('Converted to mindmap. Add headings or nested lists to build the map.');
+      this._scan();
+    } catch (e) {
+      console.error('[LightMindMap] convert error', e);
+      new obsidian.Notice('Failed to convert note to mindmap: ' + e.message);
+    }
   }
 
   onunload() {

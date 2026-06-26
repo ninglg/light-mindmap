@@ -15,6 +15,8 @@ Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/re
 
 You can also right-click a folder in the file explorer and select **Create light mindmap** to quickly create a new mindmap file in that folder.
 
+To convert an existing Markdown note, click the ribbon **Convert current note to mindmap** button, run the same command from the command palette, or right-click a Markdown file and choose **Convert to light mindmap**. The command adds the required `type: mindmap` frontmatter and default display settings without rewriting the note body.
+
 ```yaml
 ---
 type: mindmap
@@ -52,6 +54,7 @@ The mind map updates in real time as you edit the source.
 
 - Parses heading levels (`#` through `######`) into a tree for levels 1-6
 - Parses nested Markdown list items below headings, so structures can continue beyond six heading levels
+- Provides a one-click conversion button/command for existing Markdown notes
 - Strips inline markdown (bold, italic, links, wikilinks, code) from node labels
 - When multiple top-level headings exist, a virtual root node (named after the file) is created automatically
 - Fenced code blocks are skipped during parsing
@@ -253,6 +256,8 @@ MIT
 
 也可以在文件资源管理器中右键点击**文件夹**，选择 **新建轻量级脑图**，快速在该文件夹下创建一个新的脑图文件。
 
+如果要转换已有 Markdown 笔记，可以点击左侧 ribbon 的 **Convert current note to mindmap** 按钮、从命令面板运行同名命令，或右键 Markdown 文件选择 **Convert to light mindmap**。该命令只会补上所需的 `type: mindmap` frontmatter 和默认显示设置，不会重写正文内容。
+
 ```yaml
 ---
 type: mindmap
@@ -286,6 +291,7 @@ type: mindmap
 
 - 将 1-6 层标题（`#` 到 `######`）解析为树状结构
 - 解析标题下方的嵌套 Markdown 列表，使导图可以继续超过六层
+- 为已有 Markdown 笔记提供一键转换按钮/命令
 - 自动去除节点文本中的行内 Markdown 格式（粗体、斜体、链接、Wiki 链接、行内代码）
 - 当存在多个顶级标题时，会自动创建以文件名命名的虚拟根节点
 - 解析时自动跳过围栏代码块
