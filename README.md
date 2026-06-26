@@ -2,14 +2,14 @@
 
 **English** | [简体中文](#License)
 
-Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain markdown headings, no custom syntax needed.
+Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain Markdown headings and nested lists, no custom syntax needed.
 
 ## Preview
 ![Light MindMap Preview](preview.png)
 
 ## How It Works
 
-Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/reading view with a live mind map built from the note's heading hierarchy.
+Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/reading view with a live mind map built from the note's heading hierarchy. When the map goes deeper than Markdown's six heading levels, nested list items continue the hierarchy.
 
 You can also right-click a folder in the file explorer and select **Create light mindmap** to quickly create a new mindmap file in that folder.
 
@@ -46,9 +46,9 @@ The mind map updates in real time as you edit the source.
 
 ## Features
 
-### Auto-Render from Headings
+### Auto-Render from Headings and Lists
 
-- Parses all heading levels (`#` through `######`) into a tree
+- Parses heading levels (`#` through `######`) into a tree for levels 1-6
 - Parses nested Markdown list items below headings, so structures can continue beyond six heading levels
 - Strips inline markdown (bold, italic, links, wikilinks, code) from node labels
 - When multiple top-level headings exist, a virtual root node (named after the file) is created automatically
@@ -185,7 +185,7 @@ All per-file display preferences are written to frontmatter and restored on next
 
 ### Links & Wiki-links
 
-Markdown links (`[text](url)`) and wiki-links (`[[Note]]`, `[[Note|Alias]]`) in heading text are rendered as clickable links on the mindmap canvas.
+Markdown links (`[text](url)`) and wiki-links (`[[Note]]`, `[[Note|Alias]]`) in heading or list-item text are rendered as clickable links on the mindmap canvas.
 
 - **External links** (`http://...`) open in the default browser
 - **Internal links** (relative paths like `./note.md`) open in a new Obsidian tab
@@ -237,7 +237,7 @@ MIT
 
 [English](#light-mindmap) | **简体中文**
 
-功能丰富的思维导图插件——多种布局、主题、节点形状与连线样式，支持双向链接、节点折叠、PNG 导出——基于纯 Markdown 标题渲染，无需任何自定义语法。
+功能丰富的思维导图插件——多种布局、主题、节点形状与连线样式，支持双向链接、节点折叠、PNG 导出——基于 Markdown 标题和嵌套列表渲染，无需任何自定义语法。
 
 ## 预览
 
@@ -245,7 +245,7 @@ MIT
 
 ## 使用方法
 
-在笔记的 frontmatter 中添加 `type: mindmap`，插件会自动将编辑/阅读视图替换为实时思维导图，导图内容来自笔记的标题层级。
+在笔记的 frontmatter 中添加 `type: mindmap`，插件会自动将编辑/阅读视图替换为实时思维导图，导图内容来自笔记的标题层级；当导图深度超过 Markdown 的六级标题时，可用嵌套列表继续表达更深层结构。
 
 也可以在文件资源管理器中右键点击**文件夹**，选择 **新建轻量级脑图**，快速在该文件夹下创建一个新的脑图文件。
 
@@ -278,12 +278,31 @@ type: mindmap
 
 ## 功能特性
 
-### 从标题自动生成导图
+### 从标题和列表自动生成导图
 
-- 解析所有标题层级（`#` 到 `######`）为树状结构
+- 将 1-6 层标题（`#` 到 `######`）解析为树状结构
+- 解析标题下方的嵌套 Markdown 列表，使导图可以继续超过六层
 - 自动去除节点文本中的行内 Markdown 格式（粗体、斜体、链接、Wiki 链接、行内代码）
 - 当存在多个顶级标题时，会自动创建以文件名命名的虚拟根节点
 - 解析时自动跳过围栏代码块
+
+### 使用列表表达深层导图
+
+Markdown 只定义了六级标题。对于更深的导图，可以在标题后继续使用嵌套列表：
+
+```markdown
+# Root
+## Branch
+### Level 3
+#### Level 4
+##### Level 5
+###### Level 6
+- Level 7
+  - Level 8
+    - Level 9
+```
+
+画布上的节点编辑仍会写回源笔记。第 1-6 层会保存为标题，更深层级会保存为嵌套列表项。
 
 ### 布局模式
 
@@ -398,7 +417,7 @@ type: mindmap
 
 ### 链接与双向链接
 
-标题中的 Markdown 链接（`[文本](url)`）和 Wiki 链接（`[[笔记]]`、`[[笔记|别名]]`）会直接在思维导图画布上渲染为可点击的链接。
+标题或列表项中的 Markdown 链接（`[文本](url)`）和 Wiki 链接（`[[笔记]]`、`[[笔记|别名]]`）会直接在思维导图画布上渲染为可点击的链接。
 
 - **外部链接**（`http://...`）在默认浏览器中打开
 - **内部链接**（相对路径如 `./note.md`）在新的 Obsidian 标签页中打开
