@@ -327,14 +327,21 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
   }
 
+  _indentColumns(indent) {
+    return (indent || '').replace(/\t/g, '    ').length;
+  }
+
   _parseStructured(content) {
     const { frontmatterRaw, body } = this._splitFrontmatter(content);
     const lines = body.split('\n');
     const headingRe = /^(#{1,6})\s+(.+?)\s*#*\s*$/;
+    const listRe = /^(\s*)([-*+]|\d+[.)])\s+(.+?)\s*$/;
     const fenceRe = /^(```|~~~)/;
     let inFence = false;
     let fenceMarker = null;
     const headings = [];
+    const listStack = [];
+    let currentHeadingLevel = 0;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const fm = line.match(fenceRe);
@@ -348,8 +355,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
       if (m) {
         const rawText = m[2].trim();
         const collapsed = /^\*(?!\*)(.+)\*(?!\*)$/.test(rawText);
+        currentHeadingLevel = m[1].length;
+        listStack.length = 0;
         headings.push({
           srcIdx: i,
+          kind: 'heading',
           level: m[1].length,
           rawText: collapsed ? rawText.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1') : rawText,
           text: this._stripInline(rawText),
@@ -360,6 +370,32 @@ class LightMindMapPlugin extends obsidian.Plugin {
           collapsed,
           bodyRaw: '',
         });
+        continue;
+      }
+      const lm = line.match(listRe);
+      if (lm) {
+        const indent = this._indentColumns(lm[1]);
+        while (listStack.length && indent <= listStack[listStack.length - 1].indent) {
+          listStack.pop();
+        }
+        const parentLevel = listStack.length ? listStack[listStack.length - 1].level : currentHeadingLevel;
+        const level = parentLevel + 1;
+        const rawText = lm[3].trim();
+        const collapsed = /^\*(?!\*)(.+)\*(?!\*)$/.test(rawText);
+        headings.push({
+          srcIdx: i,
+          kind: 'list',
+          level,
+          rawText: collapsed ? rawText.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1') : rawText,
+          text: this._stripInline(rawText),
+          children: [],
+          parent: null,
+          dirty: false,
+          isNew: false,
+          collapsed,
+          bodyRaw: '',
+        });
+        listStack.push({ indent, level });
       }
     }
     const preBody = headings.length > 0
@@ -426,7 +462,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   // ────────────────────────────────────────────────────────────────
   // Serialization back to markdown.
   // Non-edited nodes write their original rawText; edited/new nodes
-  // write node.text. Frontmatter, pre-body, and per-heading bodyRaw
+  // write node.text. Frontmatter, pre-body, and per-node bodyRaw
   // are preserved verbatim.
   // ────────────────────────────────────────────────────────────────
 
@@ -447,7 +483,6 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _serializeNode(node, level) {
-    const cap = Math.min(6, Math.max(1, level));
     let text = node.rawText || node.text || PLACEHOLDER;
     if (node.collapsed) {
       const inner = text.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1');
@@ -455,7 +490,10 @@ class LightMindMapPlugin extends obsidian.Plugin {
     } else {
       text = text.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1');
     }
-    let s = '#'.repeat(cap) + ' ' + text + '\n';
+    const normalizedLevel = Math.max(1, level);
+    let s = normalizedLevel <= 6
+      ? '#'.repeat(normalizedLevel) + ' ' + text + '\n'
+      : '  '.repeat(normalizedLevel - 7) + '- ' + text + '\n';
     if (node.bodyRaw && node.bodyRaw.length) {
       s += node.bodyRaw;
       if (!node.bodyRaw.endsWith('\n')) s += '\n';

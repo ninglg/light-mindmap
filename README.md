@@ -35,6 +35,10 @@ type: mindmap
 ### buy fruits
 ### get stationery
 ### pick up snacks
+###### detailed checklist
+- compare prices
+  - local store
+  - online store
 
 ```
 
@@ -45,9 +49,28 @@ The mind map updates in real time as you edit the source.
 ### Auto-Render from Headings
 
 - Parses all heading levels (`#` through `######`) into a tree
+- Parses nested Markdown list items below headings, so structures can continue beyond six heading levels
 - Strips inline markdown (bold, italic, links, wikilinks, code) from node labels
 - When multiple top-level headings exist, a virtual root node (named after the file) is created automatically
 - Fenced code blocks are skipped during parsing
+
+### Deep Mindmaps with Lists
+
+Markdown only defines six heading levels. For deeper mindmaps, continue the hierarchy with nested Markdown lists after a heading:
+
+```markdown
+# Root
+## Branch
+### Level 3
+#### Level 4
+##### Level 5
+###### Level 6
+- Level 7
+  - Level 8
+    - Level 9
+```
+
+Canvas node edits are still written back to the source note. Levels 1-6 are serialized as headings, and deeper levels are serialized as nested list items.
 
 ### Layouts
 
