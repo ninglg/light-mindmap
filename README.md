@@ -4,6 +4,8 @@
 
 Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain Markdown headings and nested lists, no custom syntax needed.
 
+**Key feature:** supports mindmaps deeper than six levels. Levels 1-6 use standard Markdown headings, and deeper nodes are stored as nested Markdown list items.
+
 ## Preview
 ![Light MindMap Preview](preview.png)
 
@@ -238,6 +240,8 @@ MIT
 [English](#light-mindmap) | **简体中文**
 
 功能丰富的思维导图插件——多种布局、主题、节点形状与连线样式，支持双向链接、节点折叠、PNG 导出——基于 Markdown 标题和嵌套列表渲染，无需任何自定义语法。
+
+**主要特点：**支持超过 6 层的导图节点。第 1-6 层使用标准 Markdown 标题，更深层节点保存为嵌套 Markdown 列表项。
 
 ## 预览
 
