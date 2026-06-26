@@ -6,6 +6,14 @@ Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line sty
 
 **Key feature:** supports mindmaps deeper than six levels and three Markdown structure modes: heading-only, hybrid headings plus lists, and pure nested lists.
 
+## What's New in This Version
+
+- **More than six levels:** deep mindmaps can continue past Markdown's six heading levels.
+- **Three structure modes:** choose **Heading**, **Hybrid**, or **List** from the toolbar.
+- **Automatic format detection:** converting an existing Markdown note detects heading-only, heading-plus-list, or list-only structure and writes `mindmap-structure`.
+- **Editable source compatibility:** canvas edits are written back using the selected Markdown structure mode.
+- **Safer mode switching:** heading mode is blocked for maps deeper than six levels, because Markdown headings cannot represent that depth.
+
 ## Preview
 ![Light MindMap Preview](preview.png)
 
@@ -260,6 +268,14 @@ MIT
 功能丰富的思维导图插件——多种布局、主题、节点形状与连线样式，支持双向链接、节点折叠、PNG 导出——基于 Markdown 标题和嵌套列表渲染，无需任何自定义语法。
 
 **主要特点：**支持超过 6 层的导图节点，并同时支持三种 Markdown 结构模式：纯标题、标题加列表、纯列表。
+
+## 本版本新增
+
+- **超过 6 层节点：**导图可以突破 Markdown 六级标题限制继续向下展开。
+- **三种结构模式：**工具栏可直接选择 **Heading**、**Hybrid**、**List**。
+- **自动识别格式：**把已有 Markdown 转为导图时，会自动识别纯标题、标题加列表、纯列表，并写入 `mindmap-structure`。
+- **源文档可编辑同步：**在画布上编辑节点后，会按当前结构模式写回 Markdown。
+- **更安全的模式切换：**超过 6 层的导图不会被切到纯标题模式，避免 Markdown 表达不了深层结构。
 
 ## 预览
 
