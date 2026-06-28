@@ -1072,6 +1072,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   // ────────────────────────────────────────────────────────────────
 
   _attachNodeHandlers(el, node, overlay) {
+    el.draggable = this._isMovableNode(node);
     el.addEventListener('mousedown', (e) => {
       if (el.isContentEditable) return;
       e.stopPropagation();
@@ -1090,6 +1091,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     el.addEventListener('contextmenu', (e) => {
       this._showNodeContextMenu(overlay, node, e);
     });
+    this._attachNodeDragHandlers(el, node, overlay);
     el.addEventListener('keydown', (e) => {
       if (el.isContentEditable) {
         if (overlay._lmmMention && this._handleMentionKeydown(overlay, e)) return;
@@ -1111,6 +1113,8 @@ class LightMindMapPlugin extends obsidian.Plugin {
           e.preventDefault();
           this._cancelEdit(overlay, node);
         }
+      } else if (this._handleStructureKeydown(overlay, node, e)) {
+        return;
       } else {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -1222,6 +1226,226 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _cancelEdit(overlay, node) {
     this._exitEditMode(overlay, node);
+  }
+
+
+  _isMovableNode(node) {
+    return Boolean(node && !node.isVirtual && node.parent);
+  }
+
+  _isAncestorNode(ancestor, node) {
+    let cur = node && node.parent;
+    while (cur) {
+      if (cur === ancestor) return true;
+      cur = cur.parent;
+    }
+    return false;
+  }
+
+  _attachNodeDragHandlers(el, node, overlay) {
+    el.addEventListener('dragstart', (e) => {
+      if (!this._isMovableNode(node) || el.isContentEditable || e.target.closest('.lmm-link')) {
+        e.preventDefault();
+        return;
+      }
+      overlay._lmmDragNode = node;
+      el.classList.add('lmm-drag-source');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', node.text || '');
+      }
+    });
+
+    el.addEventListener('dragover', (e) => {
+      const dragNode = overlay._lmmDragNode;
+      const action = this._getDropAction(e, dragNode, node);
+      if (!action) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      this._showDropIndicator(overlay, el, action);
+    });
+
+    el.addEventListener('dragleave', (e) => {
+      if (el.contains(e.relatedTarget)) return;
+      el.classList.remove('lmm-drop-before', 'lmm-drop-after', 'lmm-drop-child');
+    });
+
+    el.addEventListener('drop', (e) => {
+      const dragNode = overlay._lmmDragNode;
+      const action = this._getDropAction(e, dragNode, node);
+      this._clearDropIndicators(overlay);
+      if (!action) return;
+      e.preventDefault();
+      this._moveDroppedNode(overlay, dragNode, node, action);
+    });
+
+    el.addEventListener('dragend', () => {
+      el.classList.remove('lmm-drag-source');
+      overlay._lmmDragNode = null;
+      this._clearDropIndicators(overlay);
+    });
+  }
+
+  _getDropAction(e, dragNode, targetNode) {
+    if (!this._isMovableNode(dragNode) || !targetNode || targetNode.isVirtual) return null;
+    if (dragNode === targetNode || this._isAncestorNode(dragNode, targetNode)) return null;
+    const rect = targetNode._el && targetNode._el.getBoundingClientRect();
+    if (!rect || rect.height <= 0) return 'child';
+    const y = (e.clientY - rect.top) / rect.height;
+    if (y < 0.25 && targetNode.parent) return 'before';
+    if (y > 0.75 && targetNode.parent) return 'after';
+    return 'child';
+  }
+
+  _showDropIndicator(overlay, el, action) {
+    this._clearDropIndicators(overlay);
+    el.classList.add('lmm-drop-' + action);
+  }
+
+  _clearDropIndicators(overlay) {
+    if (!overlay) return;
+    overlay.querySelectorAll('.lmm-drop-before, .lmm-drop-after, .lmm-drop-child').forEach((el) => {
+      el.classList.remove('lmm-drop-before', 'lmm-drop-after', 'lmm-drop-child');
+    });
+  }
+
+  _moveDroppedNode(overlay, node, target, action) {
+    if (action === 'before') return this._moveNodeRelative(overlay, node, target, 'before');
+    if (action === 'after') return this._moveNodeRelative(overlay, node, target, 'after');
+    return this._moveNodeAsChild(overlay, node, target);
+  }
+
+  _detachNode(node) {
+    if (!node || !node.parent) return false;
+    const siblings = node.parent.children;
+    const idx = siblings.indexOf(node);
+    if (idx < 0) return false;
+    siblings.splice(idx, 1);
+    return true;
+  }
+
+  _insertNodeAt(node, parent, index) {
+    if (!node || !parent || !parent.children) return false;
+    const safeIndex = Math.max(0, Math.min(index, parent.children.length));
+    parent.children.splice(safeIndex, 0, node);
+    node.parent = parent;
+    return true;
+  }
+
+  _persistMove(overlay, node) {
+    overlay._lmmSelected = node;
+    overlay._lmmPendingEdit = null;
+    this._persistAndRelayout(overlay);
+    return true;
+  }
+
+  _moveNodeRelative(overlay, node, target, placement) {
+    if (!this._isMovableNode(node) || !target || !target.parent) return false;
+    if (node === target || this._isAncestorNode(node, target)) return false;
+    const targetParent = target.parent;
+    const oldParent = node.parent;
+    const oldIndex = oldParent.children.indexOf(node);
+    let targetIndex = targetParent.children.indexOf(target);
+    if (oldIndex < 0 || targetIndex < 0) return false;
+    if (oldParent === targetParent && oldIndex < targetIndex) targetIndex -= 1;
+    if (!this._detachNode(node)) return false;
+    if (placement === 'after') targetIndex += 1;
+    this._insertNodeAt(node, targetParent, targetIndex);
+    return this._persistMove(overlay, node);
+  }
+
+  _moveNodeAsChild(overlay, node, target) {
+    if (!this._isMovableNode(node) || !target || target.isVirtual) return false;
+    if (node === target || this._isAncestorNode(node, target)) return false;
+    if (!this._detachNode(node)) return false;
+    if (target.collapsed) target.collapsed = false;
+    this._insertNodeAt(node, target, target.children.length);
+    return this._persistMove(overlay, node);
+  }
+
+  _moveNodeWithinSiblings(overlay, node, delta) {
+    if (!this._isMovableNode(node)) return false;
+    const siblings = node.parent.children;
+    const idx = siblings.indexOf(node);
+    const next = idx + delta;
+    if (idx < 0 || next < 0 || next >= siblings.length) return false;
+    siblings.splice(idx, 1);
+    siblings.splice(next, 0, node);
+    return this._persistMove(overlay, node);
+  }
+
+  _promoteNode(overlay, node) {
+    if (!this._isMovableNode(node)) return false;
+    const parent = node.parent;
+    if (parent.isVirtual) return false;
+    if (!parent.parent) {
+      const treeInfo = overlay._lmmTreeInfo;
+      if (!treeInfo || treeInfo.tree !== parent) return false;
+      const fileName = (overlay._lmmFile && overlay._lmmFile.basename) || 'Mind Map';
+      const virtualRoot = {
+        level: (parent.level || treeInfo.baseLevel || 1) - 1,
+        rawText: fileName,
+        text: fileName,
+        children: [parent],
+        parent: null,
+        bodyRaw: '',
+        dirty: false,
+        isNew: false,
+        collapsed: false,
+        isVirtual: true,
+      };
+      parent.parent = virtualRoot;
+      treeInfo.tree = virtualRoot;
+      treeInfo.virtualRoot = true;
+    }
+    const grandparent = parent.parent;
+    if (!grandparent) return false;
+    const parentIndex = grandparent.children.indexOf(parent);
+    if (parentIndex < 0 || !this._detachNode(node)) return false;
+    this._insertNodeAt(node, grandparent, parentIndex + 1);
+    return this._persistMove(overlay, node);
+  }
+
+  _demoteNode(overlay, node) {
+    if (!this._isMovableNode(node)) return false;
+    const siblings = node.parent.children;
+    const idx = siblings.indexOf(node);
+    if (idx <= 0) return false;
+    const newParent = siblings[idx - 1];
+    if (!newParent || newParent.isVirtual || this._isAncestorNode(node, newParent)) return false;
+    if (!this._detachNode(node)) return false;
+    if (newParent.collapsed) newParent.collapsed = false;
+    this._insertNodeAt(node, newParent, newParent.children.length);
+    return this._persistMove(overlay, node);
+  }
+
+  _handleStructureKeydown(overlay, node, e) {
+    if (e.shiftKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._moveNodeWithinSiblings(overlay, node, -1);
+      return true;
+    }
+    if (e.shiftKey && e.key === 'ArrowDown') {
+      e.preventDefault();
+      this._moveNodeWithinSiblings(overlay, node, 1);
+      return true;
+    }
+    if (e.shiftKey && e.key === 'Tab') {
+      e.preventDefault();
+      this._promoteNode(overlay, node);
+      return true;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowLeft') {
+      e.preventDefault();
+      this._promoteNode(overlay, node);
+      return true;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowRight') {
+      e.preventDefault();
+      this._demoteNode(overlay, node);
+      return true;
+    }
+    return false;
   }
 
   // ─── Wiki-link mention autocomplete ────────────────────────────

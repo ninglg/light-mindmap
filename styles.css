@@ -200,6 +200,37 @@
   filter: brightness(1.05);
 }
 
+.lmm-node.lmm-drag-source {
+  opacity: 0.45;
+}
+
+.lmm-node.lmm-drop-child {
+  outline: 3px solid var(--lmm-theme-root-accent, #6366F1);
+  outline-offset: 5px;
+  z-index: 9;
+}
+
+.lmm-node.lmm-drop-before::before,
+.lmm-node.lmm-drop-after::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lmm-theme-root-accent, #6366F1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmm-theme-root-accent, #6366F1) 18%, transparent);
+  pointer-events: none;
+}
+
+.lmm-node.lmm-drop-before::before {
+  top: -9px;
+}
+
+.lmm-node.lmm-drop-after::after {
+  bottom: -9px;
+}
+
 .lmm-node:focus {
   outline: none;
 }
