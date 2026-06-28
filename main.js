@@ -273,6 +273,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
           overlay._lmmNodeStyle = null;
           overlay._lmmStructure = null;
           overlay._lmmUndoStack = [];
+          overlay._lmmRedoStack = [];
           overlay._lmmEditSnapshot = null;
           overlay._lmmLastContent = null;
         }
@@ -1254,6 +1255,27 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (overlay._lmmUndoStack[overlay._lmmUndoStack.length - 1] === snapshot) return;
     overlay._lmmUndoStack.push(snapshot);
     if (overlay._lmmUndoStack.length > 50) overlay._lmmUndoStack.shift();
+    overlay._lmmRedoStack = [];
+  }
+
+  _pushRedoSnapshot(overlay, content) {
+    if (!overlay) return;
+    const snapshot = content || this._currentMindmapContent(overlay);
+    if (!snapshot) return;
+    if (!overlay._lmmRedoStack) overlay._lmmRedoStack = [];
+    if (overlay._lmmRedoStack[overlay._lmmRedoStack.length - 1] === snapshot) return;
+    overlay._lmmRedoStack.push(snapshot);
+    if (overlay._lmmRedoStack.length > 50) overlay._lmmRedoStack.shift();
+  }
+
+  _pushUndoSnapshotForRedo(overlay, content) {
+    if (!overlay) return;
+    const snapshot = content || this._currentMindmapContent(overlay);
+    if (!snapshot) return;
+    if (!overlay._lmmUndoStack) overlay._lmmUndoStack = [];
+    if (overlay._lmmUndoStack[overlay._lmmUndoStack.length - 1] === snapshot) return;
+    overlay._lmmUndoStack.push(snapshot);
+    if (overlay._lmmUndoStack.length > 50) overlay._lmmUndoStack.shift();
   }
 
   async _undoMindmap(overlay) {
@@ -1268,6 +1290,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const view = overlay._lmmView;
     const frontmatter = this._splitFrontmatter(content).frontmatter || {};
     try {
+      this._pushRedoSnapshot(overlay);
       overlay._lmmWriting = true;
       overlay._lmmStructure = null;
       overlay._lmmSelected = null;
@@ -1280,6 +1303,37 @@ class LightMindMapPlugin extends obsidian.Plugin {
     } catch (e) {
       console.error('[LightMindMap] undo error', e);
       new obsidian.Notice('Failed to undo mindmap action: ' + e.message);
+      return false;
+    } finally {
+      requestAnimationFrame(() => { overlay._lmmWriting = false; });
+    }
+  }
+
+  async _redoMindmap(overlay) {
+    if (!overlay || !overlay._lmmFile) return false;
+    const stack = overlay._lmmRedoStack || [];
+    const content = stack.pop();
+    if (!content) {
+      new obsidian.Notice(this._isZh() ? '没有可重做的导图操作' : 'No mindmap action to redo');
+      return false;
+    }
+    const file = overlay._lmmFile;
+    const view = overlay._lmmView;
+    const frontmatter = this._splitFrontmatter(content).frontmatter || {};
+    try {
+      this._pushUndoSnapshotForRedo(overlay);
+      overlay._lmmWriting = true;
+      overlay._lmmStructure = null;
+      overlay._lmmSelected = null;
+      overlay._lmmPendingEdit = null;
+      overlay._lmmEditSnapshot = null;
+      await this.app.vault.modify(file, content);
+      this._render(overlay, content, frontmatter, file.basename, view, file);
+      new obsidian.Notice(this._isZh() ? '已重做导图操作' : 'Redid mindmap action');
+      return true;
+    } catch (e) {
+      console.error('[LightMindMap] redo error', e);
+      new obsidian.Notice('Failed to redo mindmap action: ' + e.message);
       return false;
     } finally {
       requestAnimationFrame(() => { overlay._lmmWriting = false; });
@@ -1489,7 +1543,18 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _handleStructureKeydown(overlay, node, e) {
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z') {
+    const key = String(e.key).toLowerCase();
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && key === 'z') {
+      e.preventDefault();
+      void this._redoMindmap(overlay);
+      return true;
+    }
+    if ((e.metaKey || e.ctrlKey) && key === 'y') {
+      e.preventDefault();
+      void this._redoMindmap(overlay);
+      return true;
+    }
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && key === 'z') {
       e.preventDefault();
       void this._undoMindmap(overlay);
       return true;
