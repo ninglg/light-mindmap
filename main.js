@@ -272,6 +272,8 @@ class LightMindMapPlugin extends obsidian.Plugin {
           overlay._lmmLine = null;
           overlay._lmmNodeStyle = null;
           overlay._lmmStructure = null;
+          overlay._lmmUndoStack = [];
+          overlay._lmmEditSnapshot = null;
           overlay._lmmLastContent = null;
         }
         if (overlay._lmmLastContent === content) continue;
@@ -832,6 +834,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
         new obsidian.Notice('Heading mode only supports six levels. Use Hybrid or List for deeper mindmaps.');
         return;
       }
+      this._pushUndoSnapshot(overlay);
       overlay._lmmStructure = id;
       const newContent = this._serialize(overlay._lmmParsed, overlay._lmmTreeInfo, id);
       const nextFrontmatter = Object.assign({}, overlay._lmmFrontmatter || {}, { 'mindmap-structure': id });
@@ -1101,6 +1104,8 @@ class LightMindMapPlugin extends obsidian.Plugin {
           this._exitEditMode(overlay, node);
           this._updateNodeText(node, text);
           if (node.dirty) {
+            this._pushUndoSnapshot(overlay, overlay._lmmEditSnapshot);
+            overlay._lmmEditSnapshot = null;
             this._persistAndRelayout(overlay);
           }
         } else if (e.key === 'Tab') {
@@ -1108,7 +1113,9 @@ class LightMindMapPlugin extends obsidian.Plugin {
           const text = el.textContent;
           this._exitEditMode(overlay, node);
           this._updateNodeText(node, text);
-          this._addChild(overlay, node, true);
+          const undoSnapshot = overlay._lmmEditSnapshot;
+          overlay._lmmEditSnapshot = null;
+          this._addChild(overlay, node, true, undoSnapshot);
         } else if (e.key === 'Escape') {
           e.preventDefault();
           this._cancelEdit(overlay, node);
@@ -1121,9 +1128,6 @@ class LightMindMapPlugin extends obsidian.Plugin {
           if (node.depth !== 0) this._addSibling(overlay, node, true);
         } else if (e.key === 'Tab') {
           e.preventDefault();
-          if (node.collapsed && node.children.length) {
-            node.collapsed = false;
-          }
           this._addChild(overlay, node, true);
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
@@ -1154,6 +1158,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (!node || !node._el) return;
     if (node.isVirtual) return;
     if (node.collapsed && node.children && node.children.length) {
+      this._pushUndoSnapshot(overlay);
       node.collapsed = false;
       overlay._lmmPendingEdit = node;
       this._persistAndRelayout(overlay);
@@ -1166,6 +1171,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
     this._selectNode(overlay, node, false);
     overlay._lmmEditingNode = node;
+    overlay._lmmEditSnapshot = this._currentMindmapContent(overlay);
     el.textContent = node.rawText || node.text || PLACEHOLDER;
     el.contentEditable = 'true';
     el.classList.add('lmm-editing');
@@ -1185,7 +1191,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
       const had = node.rawText || node.text;
       this._exitEditMode(overlay, node);
       this._updateNodeText(node, text);
-      if ((node.rawText || node.text) !== had) this._persistAndRelayout(overlay);
+      if ((node.rawText || node.text) !== had) {
+        this._pushUndoSnapshot(overlay, overlay._lmmEditSnapshot);
+        overlay._lmmEditSnapshot = null;
+        this._persistAndRelayout(overlay);
+      }
     };
     el.addEventListener('blur', onBlur);
     overlay._lmmEditingBlur = onBlur;
@@ -1225,9 +1235,56 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _cancelEdit(overlay, node) {
+    overlay._lmmEditSnapshot = null;
     this._exitEditMode(overlay, node);
   }
 
+  _currentMindmapContent(overlay) {
+    if (overlay && overlay._lmmParsed && overlay._lmmTreeInfo) {
+      return this._serialize(overlay._lmmParsed, overlay._lmmTreeInfo, overlay._lmmStructure);
+    }
+    return (overlay && overlay._lmmLastContent) || '';
+  }
+
+  _pushUndoSnapshot(overlay, content) {
+    if (!overlay) return;
+    const snapshot = content || this._currentMindmapContent(overlay);
+    if (!snapshot) return;
+    if (!overlay._lmmUndoStack) overlay._lmmUndoStack = [];
+    if (overlay._lmmUndoStack[overlay._lmmUndoStack.length - 1] === snapshot) return;
+    overlay._lmmUndoStack.push(snapshot);
+    if (overlay._lmmUndoStack.length > 50) overlay._lmmUndoStack.shift();
+  }
+
+  async _undoMindmap(overlay) {
+    if (!overlay || !overlay._lmmFile) return false;
+    const stack = overlay._lmmUndoStack || [];
+    const content = stack.pop();
+    if (!content) {
+      new obsidian.Notice(this._isZh() ? '没有可回退的导图操作' : 'No mindmap action to undo');
+      return false;
+    }
+    const file = overlay._lmmFile;
+    const view = overlay._lmmView;
+    const frontmatter = this._splitFrontmatter(content).frontmatter || {};
+    try {
+      overlay._lmmWriting = true;
+      overlay._lmmStructure = null;
+      overlay._lmmSelected = null;
+      overlay._lmmPendingEdit = null;
+      overlay._lmmEditSnapshot = null;
+      await this.app.vault.modify(file, content);
+      this._render(overlay, content, frontmatter, file.basename, view, file);
+      new obsidian.Notice(this._isZh() ? '已回退上一步导图操作' : 'Undid last mindmap action');
+      return true;
+    } catch (e) {
+      console.error('[LightMindMap] undo error', e);
+      new obsidian.Notice('Failed to undo mindmap action: ' + e.message);
+      return false;
+    } finally {
+      requestAnimationFrame(() => { overlay._lmmWriting = false; });
+    }
+  }
 
   _isMovableNode(node) {
     return Boolean(node && !node.isVirtual && node.parent);
@@ -1292,8 +1349,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const rect = targetNode._el && targetNode._el.getBoundingClientRect();
     if (!rect || rect.height <= 0) return 'child';
     const y = (e.clientY - rect.top) / rect.height;
-    if (y < 0.25 && targetNode.parent) return 'before';
-    if (y > 0.75 && targetNode.parent) return 'after';
+    if (dragNode.parent && dragNode.parent === targetNode.parent) {
+      return y < 0.5 ? 'before' : 'after';
+    }
+    if (y < 0.35 && targetNode.parent) return 'before';
+    if (y > 0.65 && targetNode.parent) return 'after';
     return 'child';
   }
 
@@ -1347,6 +1407,9 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const oldIndex = oldParent.children.indexOf(node);
     let targetIndex = targetParent.children.indexOf(target);
     if (oldIndex < 0 || targetIndex < 0) return false;
+    const finalIndex = targetIndex + (placement === 'after' ? 1 : 0);
+    if (oldParent === targetParent && (oldIndex === finalIndex || oldIndex + 1 === finalIndex)) return false;
+    this._pushUndoSnapshot(overlay);
     if (oldParent === targetParent && oldIndex < targetIndex) targetIndex -= 1;
     if (!this._detachNode(node)) return false;
     if (placement === 'after') targetIndex += 1;
@@ -1357,6 +1420,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   _moveNodeAsChild(overlay, node, target) {
     if (!this._isMovableNode(node) || !target || target.isVirtual) return false;
     if (node === target || this._isAncestorNode(node, target)) return false;
+    this._pushUndoSnapshot(overlay);
     if (!this._detachNode(node)) return false;
     if (target.collapsed) target.collapsed = false;
     this._insertNodeAt(node, target, target.children.length);
@@ -1369,6 +1433,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const idx = siblings.indexOf(node);
     const next = idx + delta;
     if (idx < 0 || next < 0 || next >= siblings.length) return false;
+    this._pushUndoSnapshot(overlay);
     siblings.splice(idx, 1);
     siblings.splice(next, 0, node);
     return this._persistMove(overlay, node);
@@ -1376,11 +1441,12 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _promoteNode(overlay, node) {
     if (!this._isMovableNode(node)) return false;
+    const treeInfo = overlay._lmmTreeInfo;
     const parent = node.parent;
     if (parent.isVirtual) return false;
     if (!parent.parent) {
-      const treeInfo = overlay._lmmTreeInfo;
       if (!treeInfo || treeInfo.tree !== parent) return false;
+      this._pushUndoSnapshot(overlay);
       const fileName = (overlay._lmmFile && overlay._lmmFile.basename) || 'Mind Map';
       const virtualRoot = {
         level: (parent.level || treeInfo.baseLevel || 1) - 1,
@@ -1397,6 +1463,8 @@ class LightMindMapPlugin extends obsidian.Plugin {
       parent.parent = virtualRoot;
       treeInfo.tree = virtualRoot;
       treeInfo.virtualRoot = true;
+    } else {
+      this._pushUndoSnapshot(overlay);
     }
     const grandparent = parent.parent;
     if (!grandparent) return false;
@@ -1413,6 +1481,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (idx <= 0) return false;
     const newParent = siblings[idx - 1];
     if (!newParent || newParent.isVirtual || this._isAncestorNode(node, newParent)) return false;
+    this._pushUndoSnapshot(overlay);
     if (!this._detachNode(node)) return false;
     if (newParent.collapsed) newParent.collapsed = false;
     this._insertNodeAt(node, newParent, newParent.children.length);
@@ -1420,6 +1489,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _handleStructureKeydown(overlay, node, e) {
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z') {
+      e.preventDefault();
+      void this._undoMindmap(overlay);
+      return true;
+    }
     if (e.shiftKey && e.key === 'ArrowUp') {
       e.preventDefault();
       this._moveNodeWithinSiblings(overlay, node, -1);
@@ -1591,6 +1665,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (!node || !node.children || node.children.length === 0) return;
     const file = overlay._lmmFile;
     if (!file) return;
+    this._pushUndoSnapshot(overlay);
     node.collapsed = !node.collapsed;
     const newContent = this._serialize(overlay._lmmParsed, overlay._lmmTreeInfo, overlay._lmmStructure);
     const selPath = overlay._lmmSelected ? this._pathFor(overlay._lmmSelected, overlay._lmmTreeInfo) : null;
@@ -1630,6 +1705,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     if (!node.parent) {
       // True root: promote to virtual root so we can add a sibling.
       if (!treeInfo.virtualRoot) {
+        this._pushUndoSnapshot(overlay);
         const oldRoot = treeInfo.tree;
         const fileName = (overlay._lmmFile && overlay._lmmFile.basename) || 'Mind Map';
         const virt = {
@@ -1656,6 +1732,8 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
     const parent = node.parent;
     const idx = parent.children.indexOf(node);
+    if (idx < 0) return;
+    this._pushUndoSnapshot(overlay);
     const newNode = this._newNode('');
     newNode.parent = parent;
     parent.children.splice(idx + 1, 0, newNode);
@@ -1663,7 +1741,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
     this._persistAndRelayout(overlay);
   }
 
-  _addChild(overlay, node, edit) {
+  _addChild(overlay, node, edit, undoSnapshot) {
+    this._pushUndoSnapshot(overlay, undoSnapshot);
+    if (node.collapsed && node.children && node.children.length) {
+      node.collapsed = false;
+    }
     const newNode = this._newNode('');
     newNode.parent = node;
     node.children.push(newNode);
@@ -1672,7 +1754,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _isZh() {
-    return (window.localStorage.getItem('language') || 'en').startsWith('zh');
+    try {
+      return typeof window !== 'undefined' && (window.localStorage.getItem('language') || 'en').startsWith('zh');
+    } catch (e) {
+      return false;
+    }
   }
 
   _showNodeContextMenu(overlay, node, e) {
@@ -1700,12 +1786,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     menu.addItem((item) => {
       item.setTitle(zh ? '创建下级节点' : 'Add Child')
         .setIcon('git-branch')
-        .onClick(() => {
-          if (node.collapsed && node.children && node.children.length) {
-            node.collapsed = false;
-          }
-          this._addChild(overlay, node, true);
-        });
+        .onClick(() => this._addChild(overlay, node, true));
     });
 
     if (node.children && node.children.length) {
@@ -1739,6 +1820,8 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
     const parent = node.parent;
     const idx = parent.children.indexOf(node);
+    if (idx < 0) return;
+    this._pushUndoSnapshot(overlay);
     if (idx >= 0) parent.children.splice(idx, 1);
     if (overlay._lmmSelected === node) overlay._lmmSelected = null;
     if (overlay._lmmEditingNode === node) overlay._lmmEditingNode = null;
@@ -2839,4 +2922,5 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
 module.exports = LightMindMapPlugin;
 
+/* nosourcemap */
 /* nosourcemap */
