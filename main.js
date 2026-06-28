@@ -1076,13 +1076,18 @@ class LightMindMapPlugin extends obsidian.Plugin {
   // ────────────────────────────────────────────────────────────────
 
   _attachNodeHandlers(el, node, overlay) {
-    el.draggable = this._isMovableNode(node);
+    el._lmmNode = node;
     el.addEventListener('mousedown', (e) => {
       if (el.isContentEditable) return;
       e.stopPropagation();
     });
     el.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (overlay._lmmSuppressNodeClick) {
+        e.preventDefault();
+        overlay._lmmSuppressNodeClick = false;
+        return;
+      }
       if (el.isContentEditable) return;
       if (e.target.closest('.lmm-link')) return;
       this._selectNode(overlay, node, true);
@@ -1354,61 +1359,203 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _attachNodeDragHandlers(el, node, overlay) {
-    el.addEventListener('dragstart', (e) => {
-      if (!this._isMovableNode(node) || el.isContentEditable || e.target.closest('.lmm-link')) {
-        e.preventDefault();
-        return;
-      }
-      overlay._lmmDragNode = node;
-      el.classList.add('lmm-drag-source');
-      if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', node.text || '');
-      }
-    });
-
-    el.addEventListener('dragover', (e) => {
-      const dragNode = overlay._lmmDragNode;
-      const action = this._getDropAction(e, dragNode, node);
-      if (!action) return;
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-      this._showDropIndicator(overlay, el, action);
-    });
-
-    el.addEventListener('dragleave', (e) => {
-      if (el.contains(e.relatedTarget)) return;
-      el.classList.remove('lmm-drop-before', 'lmm-drop-after', 'lmm-drop-child');
-    });
-
-    el.addEventListener('drop', (e) => {
-      const dragNode = overlay._lmmDragNode;
-      const action = this._getDropAction(e, dragNode, node);
-      this._clearDropIndicators(overlay);
-      if (!action) return;
-      e.preventDefault();
-      this._moveDroppedNode(overlay, dragNode, node, action);
-    });
-
-    el.addEventListener('dragend', () => {
-      el.classList.remove('lmm-drag-source');
-      overlay._lmmDragNode = null;
-      this._clearDropIndicators(overlay);
+    el.addEventListener('pointerdown', (e) => {
+      this._beginNodePointerDrag(e, el, node, overlay);
     });
   }
 
+  _beginNodePointerDrag(e, el, node, overlay) {
+    if (!this._isMovableNode(node) || el.isContentEditable || e.target.closest('.lmm-link')) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    if (overlay._lmmPointerDrag) return;
+
+    const rect = el.getBoundingClientRect();
+    const drag = {
+      overlay,
+      node,
+      sourceEl: el,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+      active: false,
+      ghost: null,
+      frame: null,
+      target: null,
+      action: null,
+      cleanup: null,
+    };
+
+    const onMove = (moveEvent) => {
+      if (moveEvent.pointerId !== drag.pointerId) return;
+      this._updateNodePointerDrag(drag, moveEvent);
+    };
+    const onUp = (upEvent) => {
+      if (upEvent.pointerId !== drag.pointerId) return;
+      this._finishNodePointerDrag(drag, true);
+    };
+    const onCancel = (cancelEvent) => {
+      if (cancelEvent.pointerId !== drag.pointerId) return;
+      this._finishNodePointerDrag(drag, false);
+    };
+    const onWindowBlur = () => this._finishNodePointerDrag(drag, false);
+    drag.cleanup = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('blur', onWindowBlur);
+    };
+
+    overlay._lmmPointerDrag = drag;
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('blur', onWindowBlur);
+  }
+
+  _updateNodePointerDrag(drag, e) {
+    drag.lastX = e.clientX;
+    drag.lastY = e.clientY;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (!drag.active) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      this._startNodePointerDrag(drag);
+    }
+    e.preventDefault();
+    this._scheduleNodeDragFrame(drag);
+  }
+
+  _startNodePointerDrag(drag) {
+    drag.active = true;
+    drag.overlay._lmmDragNode = drag.node;
+    drag.overlay.classList.add('lmm-node-dragging');
+    drag.sourceEl.classList.add('lmm-drag-source');
+    this._selectNode(drag.overlay, drag.node, false);
+
+    const ghost = drag.sourceEl.cloneNode(true);
+    ghost.classList.remove('lmm-selected', 'lmm-drop-before', 'lmm-drop-after', 'lmm-drop-child');
+    ghost.classList.add('lmm-drag-ghost');
+    ghost.style.width = drag.width + 'px';
+    ghost.style.minHeight = drag.height + 'px';
+    document.body.appendChild(ghost);
+    drag.ghost = ghost;
+    this._scheduleNodeDragFrame(drag);
+  }
+
+  _scheduleNodeDragFrame(drag) {
+    if (drag.frame) return;
+    drag.frame = requestAnimationFrame(() => {
+      drag.frame = null;
+      this._renderNodeDragFrame(drag);
+    });
+  }
+
+  _renderNodeDragFrame(drag) {
+    if (!drag.active) return;
+    if (drag.ghost) {
+      const x = drag.lastX - drag.offsetX;
+      const y = drag.lastY - drag.offsetY;
+      drag.ghost.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0)';
+    }
+    const hit = this._getDropHit(drag.overlay, drag.node, drag.sourceEl, drag.lastX, drag.lastY);
+    drag.target = hit && hit.target;
+    drag.action = hit && hit.action;
+    if (drag.target && drag.action && drag.target._el) {
+      this._showDropIndicator(drag.overlay, drag.target._el, drag.action);
+    } else {
+      this._clearDropIndicators(drag.overlay);
+    }
+  }
+
+  _finishNodePointerDrag(drag, commit) {
+    if (!drag || drag.overlay._lmmPointerDrag !== drag) return;
+    if (drag.cleanup) drag.cleanup();
+    if (drag.frame) cancelAnimationFrame(drag.frame);
+    if (drag.ghost) drag.ghost.remove();
+    drag.sourceEl.classList.remove('lmm-drag-source');
+    drag.overlay.classList.remove('lmm-node-dragging');
+    drag.overlay._lmmPointerDrag = null;
+    drag.overlay._lmmDragNode = null;
+    this._clearDropIndicators(drag.overlay);
+
+    if (drag.active) {
+      drag.overlay._lmmSuppressNodeClick = true;
+      setTimeout(() => {
+        if (drag.overlay) drag.overlay._lmmSuppressNodeClick = false;
+      }, 0);
+    }
+    if (commit && drag.active && drag.target && drag.action) {
+      this._moveDroppedNode(drag.overlay, drag.node, drag.target, drag.action);
+    }
+  }
+
   _getDropAction(e, dragNode, targetNode) {
+    return this._getDropActionAt(e.clientX, e.clientY, dragNode, targetNode, false);
+  }
+
+  _getDropActionAt(clientX, clientY, dragNode, targetNode, preferRelative) {
     if (!this._isMovableNode(dragNode) || !targetNode || targetNode.isVirtual) return null;
     if (dragNode === targetNode || this._isAncestorNode(dragNode, targetNode)) return null;
     const rect = targetNode._el && targetNode._el.getBoundingClientRect();
     if (!rect || rect.height <= 0) return 'child';
-    const y = (e.clientY - rect.top) / rect.height;
+    const y = (clientY - rect.top) / rect.height;
+    if (preferRelative && targetNode.parent) {
+      return y < 0.5 ? 'before' : 'after';
+    }
     if (dragNode.parent && dragNode.parent === targetNode.parent) {
       return y < 0.5 ? 'before' : 'after';
     }
     if (y < 0.35 && targetNode.parent) return 'before';
     if (y > 0.65 && targetNode.parent) return 'after';
     return 'child';
+  }
+
+  _getDropHit(overlay, dragNode, sourceEl, clientX, clientY) {
+    const directTarget = this._getDirectDropTarget(overlay, sourceEl, clientX, clientY);
+    if (directTarget) {
+      const action = this._getDropActionAt(clientX, clientY, dragNode, directTarget, false);
+      if (action) return { target: directTarget, action };
+    }
+    const nearestTarget = this._getNearestDropTarget(overlay, dragNode, sourceEl, clientX, clientY);
+    if (!nearestTarget) return null;
+    const action = this._getDropActionAt(clientX, clientY, dragNode, nearestTarget, true);
+    return action ? { target: nearestTarget, action } : null;
+  }
+
+  _getDirectDropTarget(overlay, sourceEl, clientX, clientY) {
+    const el = document.elementFromPoint(clientX, clientY);
+    const nodeEl = el && el.closest && el.closest('.lmm-node');
+    if (!nodeEl || nodeEl === sourceEl || !overlay.contains(nodeEl)) return null;
+    return nodeEl._lmmNode || null;
+  }
+
+  _getNearestDropTarget(overlay, dragNode, sourceEl, clientX, clientY) {
+    let best = null;
+    let bestScore = Infinity;
+    overlay.querySelectorAll('.lmm-node').forEach((el) => {
+      if (el === sourceEl) return;
+      const targetNode = el._lmmNode;
+      if (!targetNode || targetNode.isVirtual) return;
+      if (targetNode === dragNode || this._isAncestorNode(dragNode, targetNode)) return;
+      const rect = el.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+      const dx = clientX < rect.left ? rect.left - clientX : (clientX > rect.right ? clientX - rect.right : 0);
+      const dy = clientY < rect.top ? rect.top - clientY : (clientY > rect.bottom ? clientY - rect.bottom : 0);
+      if (dy > 54 || dx > 120) return;
+      let score = (dy * 2) + dx;
+      if (dragNode.parent && dragNode.parent === targetNode.parent) score -= 32;
+      if (score < bestScore) {
+        bestScore = score;
+        best = targetNode;
+      }
+    });
+    return best;
   }
 
   _showDropIndicator(overlay, el, action) {
