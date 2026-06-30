@@ -91,6 +91,18 @@ const STRUCTURE_MODES = {
 
 const DEFAULT_STRUCTURE = 'heading';
 
+const DEFAULT_LAYOUT = 'balanced';
+
+const DEFAULT_PLUGIN_SETTINGS = {
+  defaultStructure: DEFAULT_STRUCTURE,
+  defaultLayout: DEFAULT_LAYOUT,
+  defaultTheme: DEFAULT_THEME,
+  defaultLine: DEFAULT_LINE,
+  defaultNodeStyle: DEFAULT_NODE_STYLE,
+  keyboardNavigation: true,
+  leafOutsideDropCreatesChild: true,
+};
+
 const HGAP = 64;
 const VGAP = 18;
 const ROOT_HGAP = 90;
@@ -99,9 +111,12 @@ const PLACEHOLDER = 'New Title';
 
 class LightMindMapPlugin extends obsidian.Plugin {
   async onload() {
+    await this.loadSettings();
     this._scan = obsidian.debounce(() => this._doScan(), 120);
     this._fileCache = null;
     this._fileCacheTime = 0;
+
+    this.addSettingTab(new LightMindMapSettingTab(this.app, this));
 
     this.registerEvent(this.app.workspace.on('file-open', () => this._scan()));
     this.registerEvent(this.app.workspace.on('active-leaf-change', () => this._scan()));
@@ -170,7 +185,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
               while (this.app.vault.getAbstractFileByPath(file.path + '/' + name)) {
                 name = base + ' ' + (++i) + '.md';
               }
-              const content = '---\ntype: mindmap\nmindmap-structure: heading\n---\n\n# New\n';
+              const content = this._newMindmapContent();
               const created = await this.app.vault.create(file.path + '/' + name, content);
               await this.app.workspace.openLinkText(created.path, '', true);
             });
@@ -190,6 +205,74 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
     // Inject SVG filter for doodle node style
     this._injectDoodleFilter();
+  }
+
+  async loadSettings() {
+    const data = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_PLUGIN_SETTINGS, data || {});
+    this._sanitizeSettings();
+  }
+
+  _sanitizeSettings() {
+    this.settings.defaultStructure = this._normalizeStructureMode(this.settings.defaultStructure) || DEFAULT_STRUCTURE;
+    this.settings.defaultLayout = this._normalizeLayout(this.settings.defaultLayout) || DEFAULT_LAYOUT;
+    this.settings.defaultTheme = THEMES[this.settings.defaultTheme] ? this.settings.defaultTheme : DEFAULT_THEME;
+    this.settings.defaultLine = LINE_STYLES[this.settings.defaultLine] ? this.settings.defaultLine : DEFAULT_LINE;
+    this.settings.defaultNodeStyle = NODE_STYLES[this.settings.defaultNodeStyle] ? this.settings.defaultNodeStyle : DEFAULT_NODE_STYLE;
+    this.settings.keyboardNavigation = this.settings.keyboardNavigation !== false;
+    this.settings.leafOutsideDropCreatesChild = this.settings.leafOutsideDropCreatesChild !== false;
+  }
+
+  async saveSettings() {
+    this._sanitizeSettings();
+    await this.saveData(this.settings);
+  }
+
+  _getSetting(key) {
+    if (this.settings && Object.prototype.hasOwnProperty.call(this.settings, key)) {
+      return this.settings[key];
+    }
+    return DEFAULT_PLUGIN_SETTINGS[key];
+  }
+
+  _defaultStructure() {
+    return this._normalizeStructureMode(this._getSetting('defaultStructure')) || DEFAULT_STRUCTURE;
+  }
+
+  _defaultLayout() {
+    return this._normalizeLayout(this._getSetting('defaultLayout')) || DEFAULT_LAYOUT;
+  }
+
+  _defaultTheme() {
+    const key = this._getSetting('defaultTheme');
+    return THEMES[key] ? key : DEFAULT_THEME;
+  }
+
+  _defaultLine() {
+    const key = this._getSetting('defaultLine');
+    return LINE_STYLES[key] ? key : DEFAULT_LINE;
+  }
+
+  _defaultNodeStyle() {
+    const key = this._getSetting('defaultNodeStyle');
+    return NODE_STYLES[key] ? key : DEFAULT_NODE_STYLE;
+  }
+
+  _newMindmapContent() {
+    const structure = this._defaultStructure();
+    const body = structure === 'list' ? '- New\n' : '# New\n';
+    return [
+      '---',
+      'type: mindmap',
+      'mindmap-structure: ' + structure,
+      'mindmap-layout: ' + this._defaultLayout(),
+      'mindmap-theme: ' + this._defaultTheme(),
+      'mindmap-line: ' + this._defaultLine(),
+      'mindmap-node: ' + this._defaultNodeStyle(),
+      '---',
+      '',
+      body
+    ].join('\n');
   }
 
   async _convertActiveFileToMindmap() {
@@ -216,10 +299,10 @@ class LightMindMapPlugin extends obsidian.Plugin {
         fm.type = 'mindmap';
         const existingStructure = this._readStructureFromFrontmatter(fm);
         if (!existingStructure) fm['mindmap-structure'] = structure;
-        if (!fm['mindmap-layout']) fm['mindmap-layout'] = 'balanced';
-        if (!fm['mindmap-theme']) fm['mindmap-theme'] = DEFAULT_THEME;
-        if (!fm['mindmap-line']) fm['mindmap-line'] = DEFAULT_LINE;
-        if (!fm['mindmap-node']) fm['mindmap-node'] = DEFAULT_NODE_STYLE;
+        if (!fm['mindmap-layout']) fm['mindmap-layout'] = this._defaultLayout();
+        if (!fm['mindmap-theme']) fm['mindmap-theme'] = this._defaultTheme();
+        if (!fm['mindmap-line']) fm['mindmap-line'] = this._defaultLine();
+        if (!fm['mindmap-node']) fm['mindmap-node'] = this._defaultNodeStyle();
       });
       if (openAfter) {
         await this.app.workspace.openLinkText(file.path, '', true);
@@ -427,11 +510,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
     if (hasList) return 'list';
     if (hasHeading) return 'heading';
-    return DEFAULT_STRUCTURE;
+    return this._defaultStructure();
   }
 
   _parseStructured(content, structureMode) {
-    const mode = this._normalizeStructureMode(structureMode) || DEFAULT_STRUCTURE;
+    const mode = this._normalizeStructureMode(structureMode) || this._defaultStructure();
     const { frontmatterRaw, body } = this._splitFrontmatter(content);
     const lines = body.split('\n');
     const headingRe = /^(#{1,6})\s+(.+?)\s*#*\s*$/;
@@ -568,7 +651,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   // ────────────────────────────────────────────────────────────────
 
   _serialize(parsed, treeInfo, structureMode) {
-    const mode = this._normalizeStructureMode(structureMode) || parsed.structureMode || DEFAULT_STRUCTURE;
+    const mode = this._normalizeStructureMode(structureMode) || parsed.structureMode || this._defaultStructure();
     let out = parsed.frontmatterRaw;
     if (parsed.preBody && parsed.preBody.length) {
       out += parsed.preBody;
@@ -602,7 +685,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _serializeNode(node, level, structureMode) {
-    const mode = this._normalizeStructureMode(structureMode) || DEFAULT_STRUCTURE;
+    const mode = this._normalizeStructureMode(structureMode) || this._defaultStructure();
     let text = node.rawText || node.text || PLACEHOLDER;
     if (node.collapsed) {
       const inner = text.replace(/^\*(?!\*)(.+)\*(?!\*)$/, '$1');
@@ -677,20 +760,25 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _resolveTheme(frontmatter) {
     const id = frontmatter && (frontmatter['mindmap-theme'] || frontmatter['mindmap_theme']);
-    const key = id && THEMES[String(id).toLowerCase()] ? String(id).toLowerCase() : DEFAULT_THEME;
+    const key = id && THEMES[String(id).toLowerCase()] ? String(id).toLowerCase() : this._defaultTheme();
     return key;
   }
 
   _resolveLine(frontmatter) {
     const id = frontmatter && (frontmatter['mindmap-line'] || frontmatter['mindmap_line']);
-    const key = id && LINE_STYLES[String(id).toLowerCase()] ? String(id).toLowerCase() : DEFAULT_LINE;
+    const key = id && LINE_STYLES[String(id).toLowerCase()] ? String(id).toLowerCase() : this._defaultLine();
     return key;
   }
 
   _resolveNodeStyle(frontmatter) {
     const id = frontmatter && (frontmatter['mindmap-node'] || frontmatter['mindmap_node']);
-    const key = id && NODE_STYLES[String(id).toLowerCase()] ? String(id).toLowerCase() : DEFAULT_NODE_STYLE;
+    const key = id && NODE_STYLES[String(id).toLowerCase()] ? String(id).toLowerCase() : this._defaultNodeStyle();
     return key;
+  }
+
+  _normalizeLayout(value) {
+    const key = value ? String(value).toLowerCase() : '';
+    return ['balanced', 'right', 'left', 'tree', 'radial'].includes(key) ? key : null;
   }
 
   _normalizeStructureMode(value) {
@@ -765,8 +853,9 @@ class LightMindMapPlugin extends obsidian.Plugin {
     overlay._lmmFrontmatter = frontmatter;
 
     const fmLayout = frontmatter && (frontmatter['mindmap-layout'] || frontmatter['mindmap_layout'] || frontmatter.layout);
-    const fmLayoutValid = fmLayout && ['balanced', 'right', 'left', 'tree', 'radial'].includes(String(fmLayout));
-    const layout = overlay._lmmLayout || (fmLayoutValid ? String(fmLayout) : 'balanced');
+    const resolvedFmLayout = this._normalizeLayout(fmLayout);
+    const fmLayoutValid = Boolean(resolvedFmLayout);
+    const layout = overlay._lmmLayout || resolvedFmLayout || this._defaultLayout();
     overlay._lmmLayout = layout;
 
     const fmTheme = frontmatter && (frontmatter['mindmap-theme'] || frontmatter['mindmap_theme']);
@@ -828,7 +917,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
     }
     structureSelect.onchange = async () => {
       const id = structureSelect.value;
-      const previous = overlay._lmmStructure || DEFAULT_STRUCTURE;
+      const previous = overlay._lmmStructure || this._defaultStructure();
       if (!STRUCTURE_MODES[id] || id === previous) return;
       if (id === 'heading' && this._maxSerializedLevel(overlay._lmmTreeInfo) > 6) {
         structureSelect.value = previous;
@@ -1532,6 +1621,7 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _isLeafOutsideDrop(clientX, clientY, targetNode, rect, overlay) {
+    if (this._getSetting('leafOutsideDropCreatesChild') === false) return false;
     if (!targetNode || targetNode.collapsed || (targetNode.children && targetNode.children.length > 0)) return false;
     const verticalPadding = Math.max(8, rect.height * 0.25);
     if (clientY < rect.top + verticalPadding || clientY > rect.bottom - verticalPadding) return false;
@@ -1716,6 +1806,13 @@ class LightMindMapPlugin extends obsidian.Plugin {
 
   _handleStructureKeydown(overlay, node, e) {
     const key = String(e.key).toLowerCase();
+    if (this._getSetting('keyboardNavigation') !== false &&
+        !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey &&
+        ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      e.preventDefault();
+      this._selectNodeByArrow(overlay, node, key);
+      return true;
+    }
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && key === 'z') {
       e.preventDefault();
       void this._redoMindmap(overlay);
@@ -1757,6 +1854,66 @@ class LightMindMapPlugin extends obsidian.Plugin {
       return true;
     }
     return false;
+  }
+
+  _selectNodeByArrow(overlay, node, key) {
+    const target = this._findNodeByArrow(overlay, node, key);
+    if (!target) return false;
+    this._selectNode(overlay, target, true);
+    return true;
+  }
+
+  _findNodeByArrow(overlay, node, key) {
+    if (!overlay || !node || !node._el) return null;
+    const rect = node._el.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const nodes = this._visibleNodes(overlay);
+    let best = null;
+    let bestScore = Infinity;
+    for (const candidate of nodes) {
+      if (!candidate || candidate === node || !candidate._el) continue;
+      const cRect = candidate._el.getBoundingClientRect();
+      if (!cRect || cRect.width <= 0 || cRect.height <= 0) continue;
+      const ccx = cRect.left + cRect.width / 2;
+      const ccy = cRect.top + cRect.height / 2;
+      const dx = ccx - cx;
+      const dy = ccy - cy;
+      let projection;
+      let perpendicular;
+      if (key === 'arrowright') {
+        if (dx <= 4) continue;
+        projection = dx;
+        perpendicular = Math.abs(dy);
+      } else if (key === 'arrowleft') {
+        if (dx >= -4) continue;
+        projection = -dx;
+        perpendicular = Math.abs(dy);
+      } else if (key === 'arrowdown') {
+        if (dy <= 4) continue;
+        projection = dy;
+        perpendicular = Math.abs(dx);
+      } else {
+        if (dy >= -4) continue;
+        projection = -dy;
+        perpendicular = Math.abs(dx);
+      }
+      let score = projection + perpendicular * 1.8;
+      if (node.parent && candidate.parent === node.parent) score -= 20;
+      if (candidate.parent === node || node.parent === candidate) score -= 12;
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    return best;
+  }
+
+  _visibleNodes(overlay) {
+    return Array.from(overlay.querySelectorAll('.lmm-node'))
+      .map((el) => el._lmmNode)
+      .filter((node) => node && node._el);
   }
 
   // ─── Wiki-link mention autocomplete ────────────────────────────
@@ -3154,6 +3311,122 @@ class LightMindMapPlugin extends obsidian.Plugin {
       console.error('[LightMindMap] export error:', e);
       new obsidian.Notice('Export failed: ' + e.message);
     }
+  }
+}
+
+class LightMindMapSettingTab extends obsidian.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.createEl('h2', { text: 'Light Mindmap' });
+
+    containerEl.createEl('h3', { text: 'Default mindmap options' });
+    containerEl.createEl('p', {
+      text: 'These defaults are used for new mindmaps, converted notes, and mindmap notes that do not already define the matching frontmatter field.'
+    });
+
+    this.addDropdownSetting(
+      'Default structure mode',
+      'Heading is closest to standard Markdown; Hybrid keeps deep maps readable on mobile; List is the most compact.',
+      'defaultStructure',
+      STRUCTURE_MODES
+    );
+
+    this.addDropdownSetting(
+      'Default layout',
+      'Initial layout for new or unconfigured mindmaps.',
+      'defaultLayout',
+      {
+        balanced: { name: 'Balanced' },
+        right: { name: 'Right' },
+        left: { name: 'Left' },
+        tree: { name: 'Tree' },
+        radial: { name: 'Radial' }
+      }
+    );
+
+    this.addDropdownSetting(
+      'Default theme',
+      'Initial color theme for new or unconfigured mindmaps.',
+      'defaultTheme',
+      THEMES
+    );
+
+    this.addDropdownSetting(
+      'Default line style',
+      'Initial connector style for new or unconfigured mindmaps.',
+      'defaultLine',
+      LINE_STYLES
+    );
+
+    this.addDropdownSetting(
+      'Default node style',
+      'Initial node shape for new or unconfigured mindmaps.',
+      'defaultNodeStyle',
+      NODE_STYLES
+    );
+
+    containerEl.createEl('h3', { text: 'Interaction' });
+
+    new obsidian.Setting(containerEl)
+      .setName('Arrow-key node navigation')
+      .setDesc('Use plain arrow keys to move selection between visible nodes. Existing shortcuts such as Shift+Arrow and Cmd/Ctrl+Arrow are unchanged.')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.keyboardNavigation !== false)
+          .onChange(async (value) => {
+            this.plugin.settings.keyboardNavigation = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new obsidian.Setting(containerEl)
+      .setName('Leaf outside drop creates child')
+      .setDesc('When dragging onto the outside edge of a leaf node, make the dragged node a child of that leaf. Top and bottom zones still insert before or after the target.')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.leafOutsideDropCreatesChild !== false)
+          .onChange(async (value) => {
+            this.plugin.settings.leafOutsideDropCreatesChild = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new obsidian.Setting(containerEl)
+      .setName('Reset defaults')
+      .setDesc('Restore Light Mindmap defaults. Existing note frontmatter is not changed.')
+      .addButton((button) => {
+        button
+          .setButtonText('Reset')
+          .onClick(async () => {
+            this.plugin.settings = Object.assign({}, DEFAULT_PLUGIN_SETTINGS);
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+  }
+
+  addDropdownSetting(name, desc, key, options) {
+    new obsidian.Setting(this.containerEl)
+      .setName(name)
+      .setDesc(desc)
+      .addDropdown((dropdown) => {
+        for (const id of Object.keys(options)) {
+          dropdown.addOption(id, options[id].name || id);
+        }
+        dropdown
+          .setValue(this.plugin.settings[key])
+          .onChange(async (value) => {
+            this.plugin.settings[key] = value;
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
   }
 }
 
