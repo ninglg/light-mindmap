@@ -1441,8 +1441,17 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const ghost = drag.sourceEl.cloneNode(true);
     ghost.classList.remove('lmm-selected', 'lmm-drop-before', 'lmm-drop-after', 'lmm-drop-child');
     ghost.classList.add('lmm-drag-ghost');
+    ghost.removeAttribute('tabindex');
+    ghost.style.position = 'fixed';
+    ghost.style.left = '0px';
+    ghost.style.top = '0px';
+    ghost.style.right = 'auto';
+    ghost.style.bottom = 'auto';
+    ghost.style.margin = '0';
+    ghost.style.boxSizing = 'border-box';
+    ghost.style.transformOrigin = 'top left';
     ghost.style.width = drag.width + 'px';
-    ghost.style.minHeight = drag.height + 'px';
+    ghost.style.height = drag.height + 'px';
     document.body.appendChild(ghost);
     drag.ghost = ghost;
     this._scheduleNodeDragFrame(drag);
@@ -1522,6 +1531,11 @@ class LightMindMapPlugin extends obsidian.Plugin {
       const action = this._getDropActionAt(clientX, clientY, dragNode, directTarget, false);
       if (action) return { target: directTarget, action };
     }
+    const siblingTarget = this._getNearestSiblingDropTarget(dragNode, sourceEl, clientX, clientY);
+    if (siblingTarget) {
+      const action = this._getDropActionAt(clientX, clientY, dragNode, siblingTarget, true);
+      if (action) return { target: siblingTarget, action };
+    }
     const nearestTarget = this._getNearestDropTarget(overlay, dragNode, sourceEl, clientX, clientY);
     if (!nearestTarget) return null;
     const action = this._getDropActionAt(clientX, clientY, dragNode, nearestTarget, true);
@@ -1533,6 +1547,27 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const nodeEl = el && el.closest && el.closest('.lmm-node');
     if (!nodeEl || nodeEl === sourceEl || !overlay.contains(nodeEl)) return null;
     return nodeEl._lmmNode || null;
+  }
+
+  _getNearestSiblingDropTarget(dragNode, sourceEl, clientX, clientY) {
+    if (!dragNode || !dragNode.parent || !dragNode.parent.children) return null;
+    let best = null;
+    let bestScore = Infinity;
+    dragNode.parent.children.forEach((targetNode) => {
+      const el = targetNode && targetNode._el;
+      if (!el || el === sourceEl || targetNode === dragNode) return;
+      const rect = el.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+      const dx = clientX < rect.left ? rect.left - clientX : (clientX > rect.right ? clientX - rect.right : 0);
+      const dy = clientY < rect.top ? rect.top - clientY : (clientY > rect.bottom ? clientY - rect.bottom : 0);
+      if (dy > 72 || dx > 160) return;
+      const score = (dy * 2) + dx;
+      if (score < bestScore) {
+        bestScore = score;
+        best = targetNode;
+      }
+    });
+    return best;
   }
 
   _getNearestDropTarget(overlay, dragNode, sourceEl, clientX, clientY) {
