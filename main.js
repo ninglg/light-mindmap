@@ -1505,41 +1505,52 @@ class LightMindMapPlugin extends obsidian.Plugin {
   }
 
   _getDropAction(e, dragNode, targetNode) {
-    return this._getDropActionAt(e.clientX, e.clientY, dragNode, targetNode, false);
+    return this._getDropActionAt(e.clientX, e.clientY, dragNode, targetNode);
   }
 
-  _getDropActionAt(clientX, clientY, dragNode, targetNode, preferRelative) {
+  _getDropActionAt(clientX, clientY, dragNode, targetNode, overlay) {
     if (!this._isMovableNode(dragNode) || !targetNode || targetNode.isVirtual) return null;
     if (dragNode === targetNode || this._isAncestorNode(dragNode, targetNode)) return null;
     const rect = targetNode._el && targetNode._el.getBoundingClientRect();
     if (!rect || rect.height <= 0) return 'child';
+    if (this._isLeafOutsideDrop(clientX, clientY, targetNode, rect, overlay)) return 'child';
+    if (!targetNode.parent) return 'child';
     const y = (clientY - rect.top) / rect.height;
-    if (preferRelative && targetNode.parent) {
-      return y < 0.5 ? 'before' : 'after';
-    }
-    if (dragNode.parent && dragNode.parent === targetNode.parent) {
-      return y < 0.5 ? 'before' : 'after';
-    }
-    if (y < 0.35 && targetNode.parent) return 'before';
-    if (y > 0.65 && targetNode.parent) return 'after';
-    return 'child';
+    return y < 0.5 ? 'before' : 'after';
   }
 
   _getDropHit(overlay, dragNode, sourceEl, clientX, clientY) {
     const directTarget = this._getDirectDropTarget(overlay, sourceEl, clientX, clientY);
     if (directTarget) {
-      const action = this._getDropActionAt(clientX, clientY, dragNode, directTarget, false);
+      const action = this._getDropActionAt(clientX, clientY, dragNode, directTarget, overlay);
       if (action) return { target: directTarget, action };
-    }
-    const siblingTarget = this._getNearestSiblingDropTarget(dragNode, sourceEl, clientX, clientY);
-    if (siblingTarget) {
-      const action = this._getDropActionAt(clientX, clientY, dragNode, siblingTarget, true);
-      if (action) return { target: siblingTarget, action };
     }
     const nearestTarget = this._getNearestDropTarget(overlay, dragNode, sourceEl, clientX, clientY);
     if (!nearestTarget) return null;
-    const action = this._getDropActionAt(clientX, clientY, dragNode, nearestTarget, true);
+    const action = this._getDropActionAt(clientX, clientY, dragNode, nearestTarget, overlay);
     return action ? { target: nearestTarget, action } : null;
+  }
+
+  _isLeafOutsideDrop(clientX, clientY, targetNode, rect, overlay) {
+    if (!targetNode || targetNode.collapsed || (targetNode.children && targetNode.children.length > 0)) return false;
+    const verticalPadding = Math.max(8, rect.height * 0.25);
+    if (clientY < rect.top + verticalPadding || clientY > rect.bottom - verticalPadding) return false;
+    const side = this._getChildDropSide(targetNode, overlay, clientX, rect);
+    const edgePad = Math.min(24, Math.max(10, rect.width * 0.25));
+    const outsideReach = Math.max(80, rect.width);
+    if (side === 'left') {
+      return clientX <= rect.left + edgePad && clientX >= rect.left - outsideReach;
+    }
+    return clientX >= rect.right - edgePad && clientX <= rect.right + outsideReach;
+  }
+
+  _getChildDropSide(targetNode, overlay, clientX, rect) {
+    const layout = (overlay && overlay._lmmLayout) || 'balanced';
+    if (layout === 'left') return 'left';
+    if (layout === 'right' || layout === 'tree' || layout === 'radial') return 'right';
+    if (targetNode && targetNode._side === 'left') return 'left';
+    if (targetNode && targetNode._side === 'right') return 'right';
+    return clientX < rect.left + rect.width / 2 ? 'left' : 'right';
   }
 
   _getDirectDropTarget(overlay, sourceEl, clientX, clientY) {
@@ -1547,27 +1558,6 @@ class LightMindMapPlugin extends obsidian.Plugin {
     const nodeEl = el && el.closest && el.closest('.lmm-node');
     if (!nodeEl || nodeEl === sourceEl || !overlay.contains(nodeEl)) return null;
     return nodeEl._lmmNode || null;
-  }
-
-  _getNearestSiblingDropTarget(dragNode, sourceEl, clientX, clientY) {
-    if (!dragNode || !dragNode.parent || !dragNode.parent.children) return null;
-    let best = null;
-    let bestScore = Infinity;
-    dragNode.parent.children.forEach((targetNode) => {
-      const el = targetNode && targetNode._el;
-      if (!el || el === sourceEl || targetNode === dragNode) return;
-      const rect = el.getBoundingClientRect();
-      if (!rect || rect.width <= 0 || rect.height <= 0) return;
-      const dx = clientX < rect.left ? rect.left - clientX : (clientX > rect.right ? clientX - rect.right : 0);
-      const dy = clientY < rect.top ? rect.top - clientY : (clientY > rect.bottom ? clientY - rect.bottom : 0);
-      if (dy > 72 || dx > 160) return;
-      const score = (dy * 2) + dx;
-      if (score < bestScore) {
-        bestScore = score;
-        best = targetNode;
-      }
-    });
-    return best;
   }
 
   _getNearestDropTarget(overlay, dragNode, sourceEl, clientX, clientY) {
