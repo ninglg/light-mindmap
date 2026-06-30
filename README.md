@@ -2,20 +2,36 @@
 
 **English** | [简体中文](#License)
 
-Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain markdown headings, no custom syntax needed.
+Feature-rich mindmap plugin — multiple layouts, themes, node shapes & line styles, wikilink support, node collapse, PNG export — all from plain Markdown headings and nested lists, no custom syntax needed.
+
+**Key feature:** supports mindmaps deeper than six levels and three Markdown structure modes: heading-only, hybrid headings plus lists, and pure nested lists.
+
+## What's New in This Version
+
+- **More than six levels:** deep mindmaps can continue past Markdown's six heading levels.
+- **Three structure modes:** choose **Heading**, **Hybrid**, or **List** from the toolbar.
+- **Automatic format detection:** converting an existing Markdown note detects heading-only, heading-plus-list, or list-only structure and writes `mindmap-structure`.
+- **Editable source compatibility:** canvas edits are written back using the selected Markdown structure mode.
+- **Drag and keyboard restructuring:** move nodes by dragging, reorder siblings with `Shift + ArrowUp/ArrowDown`, promote with `Shift + Tab` or `Mod + ArrowLeft`, and demote with `Mod + ArrowRight`.
+- **Undo and redo for map operations:** press `Mod + Z` to undo and `Mod + Shift + Z` or `Mod + Y` to redo.
+- **Improved sibling drops:** dragging between nodes with the same parent uses the whole target node split into upper/lower halves, making reordering easier.
+- **Safer mode switching:** heading mode is blocked for maps deeper than six levels, because Markdown headings cannot represent that depth.
 
 ## Preview
 ![Light MindMap Preview](preview.png)
 
 ## How It Works
 
-Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/reading view with a live mind map built from the note's heading hierarchy.
+Add `type: mindmap` to any note's frontmatter. The plugin replaces the editor/reading view with a live mind map built from the note's Markdown structure. Use the toolbar **Mode** dropdown to choose **Heading**, **Hybrid**, or **List** mode. Hybrid mode stores levels 1-6 as headings and deeper nodes as nested list items.
 
 You can also right-click a folder in the file explorer and select **Create light mindmap** to quickly create a new mindmap file in that folder.
+
+To convert an existing Markdown note, click the ribbon **Convert current note to mindmap** button, run the same command from the command palette, or right-click a Markdown file and choose **Convert to light mindmap**. The command adds the required `type: mindmap` frontmatter and default display settings without rewriting the note body. It also detects whether the note is heading-only, heading plus list, or list-only, then writes the matching `mindmap-structure` value.
 
 ```yaml
 ---
 type: mindmap
+mindmap-structure: hybrid
 ---
 
 # My Plan
@@ -35,6 +51,10 @@ type: mindmap
 ### buy fruits
 ### get stationery
 ### pick up snacks
+###### detailed checklist
+- compare prices
+  - local store
+  - online store
 
 ```
 
@@ -42,12 +62,44 @@ The mind map updates in real time as you edit the source.
 
 ## Features
 
-### Auto-Render from Headings
+### Auto-Render from Selectable Structure Modes
 
-- Parses all heading levels (`#` through `######`) into a tree
+- Toolbar **Mode** dropdown switches between `heading`, `hybrid`, and `list` structure modes
+- `heading` mode parses Markdown headings (`#` through `######`) only
+- `hybrid` mode parses headings plus nested list items, so structures can continue beyond six heading levels
+- `list` mode parses nested Markdown list items only
+- Provides a one-click conversion button/command for existing Markdown notes and auto-detects the structure mode
 - Strips inline markdown (bold, italic, links, wikilinks, code) from node labels
 - When multiple top-level headings exist, a virtual root node (named after the file) is created automatically
 - Fenced code blocks are skipped during parsing
+
+### Structure Modes
+
+| Mode | Source format | Best for |
+| ---- | ------------- | -------- |
+| **Heading** | Markdown headings only | Short maps that should stay as ordinary document outlines |
+| **Hybrid** | Headings for levels 1-6, nested lists for deeper nodes | Deep maps that still need readable document sections |
+| **List** | Nested Markdown lists only | Mobile-friendly outlining and fast indentation editing |
+
+The selected mode is saved in frontmatter as `mindmap-structure`. If the key is missing, the plugin scans the note body and chooses `hybrid` for heading plus list documents, `list` for list-only documents, and `heading` for heading-only documents.
+
+### Deep Mindmaps with Lists
+
+Markdown only defines six heading levels. For deeper mindmaps, continue the hierarchy with nested Markdown lists after a heading:
+
+```markdown
+# Root
+## Branch
+### Level 3
+#### Level 4
+##### Level 5
+###### Level 6
+- Level 7
+  - Level 8
+    - Level 9
+```
+
+Canvas node edits are still written back to the source note. Levels 1-6 are serialized as headings, and deeper levels are serialized as nested list items.
 
 ### Layouts
 
@@ -120,6 +172,12 @@ Nodes can be edited directly on the canvas — changes are written back to the m
 | Add child (without editing)   | Select node, press **Tab**                     |
 | Delete node                   | Select node, press **Delete** or **Backspace** |
 | Collapse / expand node        | Select node, press **Space**                   |
+| Undo last map operation       | Select node, press **Mod + Z**                    |
+| Redo last undone operation    | Select node, press **Mod + Shift + Z** or **Mod + Y** |
+| Move sibling up / down        | Select node, press **Shift + ArrowUp / ArrowDown** |
+| Promote node                  | Select node, press **Shift + Tab** or **Mod + ArrowLeft** |
+| Demote under previous sibling | Select node, press **Mod + ArrowRight**        |
+| Drag node                     | Drag onto another node; top/bottom drops reorder, middle drops as child |
 | Right-click context menu      | Right-click on node                            |
 
 - The root node cannot be deleted.
@@ -148,6 +206,7 @@ All per-file display preferences are written to frontmatter and restored on next
 
 | Frontmatter key  | Values                                                                 |
 | ---------------- | ---------------------------------------------------------------------- |
+| `mindmap-structure` | `heading` / `hybrid` / `list`                                      |
 | `mindmap-layout` | `balanced` / `right` / `left` / `tree` / `radial`                      |
 | `mindmap-theme`  | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight` / `slate` |
 | `mindmap-line`   | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed` |
@@ -162,7 +221,7 @@ All per-file display preferences are written to frontmatter and restored on next
 
 ### Links & Wiki-links
 
-Markdown links (`[text](url)`) and wiki-links (`[[Note]]`, `[[Note|Alias]]`) in heading text are rendered as clickable links on the mindmap canvas.
+Markdown links (`[text](url)`) and wiki-links (`[[Note]]`, `[[Note|Alias]]`) in heading or list-item text are rendered as clickable links on the mindmap canvas.
 
 - **External links** (`http://...`) open in the default browser
 - **Internal links** (relative paths like `./note.md`) open in a new Obsidian tab
@@ -193,6 +252,7 @@ Click the **Export PNG** button in the toolbar to save the current mindmap as a 
 ```yaml
 ---
 type: mindmap
+mindmap-structure: hybrid
 mindmap-layout: balanced
 mindmap-theme: vibrant
 mindmap-line: curve
@@ -214,7 +274,20 @@ MIT
 
 [English](#light-mindmap) | **简体中文**
 
-功能丰富的思维导图插件——多种布局、主题、节点形状与连线样式，支持双向链接、节点折叠、PNG 导出——基于纯 Markdown 标题渲染，无需任何自定义语法。
+功能丰富的思维导图插件——多种布局、主题、节点形状与连线样式，支持双向链接、节点折叠、PNG 导出——基于 Markdown 标题和嵌套列表渲染，无需任何自定义语法。
+
+**主要特点：**支持超过 6 层的导图节点，并同时支持三种 Markdown 结构模式：纯标题、标题加列表、纯列表。
+
+## 本版本新增
+
+- **超过 6 层节点：**导图可以突破 Markdown 六级标题限制继续向下展开。
+- **三种结构模式：**工具栏可直接选择 **Heading**、**Hybrid**、**List**。
+- **自动识别格式：**把已有 Markdown 转为导图时，会自动识别纯标题、标题加列表、纯列表，并写入 `mindmap-structure`。
+- **源文档可编辑同步：**在画布上编辑节点后，会按当前结构模式写回 Markdown。
+- **拖拽和快捷键调整结构：**可拖拽节点改变位置和父级；`Shift + ArrowUp/ArrowDown` 调整同级顺序，`Shift + Tab` 或 `Mod + ArrowLeft` 提升一级，`Mod + ArrowRight` 降到上一个同级节点下面。
+- **导图操作撤销和重做：**选中节点后按 `Mod + Z` 撤回最近一次导图操作，按 `Mod + Shift + Z` 或 `Mod + Y` 重做。
+- **同级拖拽更容易命中：**同父节点之间拖拽排序时，目标节点整块区域会按上下半区识别前/后位置。
+- **更安全的模式切换：**超过 6 层的导图不会被切到纯标题模式，避免 Markdown 表达不了深层结构。
 
 ## 预览
 
@@ -222,13 +295,16 @@ MIT
 
 ## 使用方法
 
-在笔记的 frontmatter 中添加 `type: mindmap`，插件会自动将编辑/阅读视图替换为实时思维导图，导图内容来自笔记的标题层级。
+在笔记的 frontmatter 中添加 `type: mindmap`，插件会自动将编辑/阅读视图替换为实时思维导图，导图内容来自笔记的 Markdown 结构。可以在工具栏 **Mode** 下拉框中选择 **Heading**、**Hybrid** 或 **List** 模式；混合模式会把 1-6 层保存为标题，更深层节点保存为嵌套列表。
 
 也可以在文件资源管理器中右键点击**文件夹**，选择 **新建轻量级脑图**，快速在该文件夹下创建一个新的脑图文件。
+
+如果要转换已有 Markdown 笔记，可以点击左侧 ribbon 的 **Convert current note to mindmap** 按钮、从命令面板运行同名命令，或右键 Markdown 文件选择 **Convert to light mindmap**。该命令只会补上所需的 `type: mindmap` frontmatter 和默认显示设置，不会重写正文内容。它会自动识别笔记是纯标题、标题加列表，还是纯列表，并写入对应的 `mindmap-structure`。
 
 ```yaml
 ---
 type: mindmap
+mindmap-structure: hybrid
 ---
 
 # My Plan
@@ -255,12 +331,44 @@ type: mindmap
 
 ## 功能特性
 
-### 从标题自动生成导图
+### 从可选结构模式自动生成导图
 
-- 解析所有标题层级（`#` 到 `######`）为树状结构
+- 工具栏 **Mode** 下拉框可在 `heading`、`hybrid`、`list` 三种结构模式间切换
+- `heading` 模式只解析 Markdown 标题（`#` 到 `######`）
+- `hybrid` 模式解析标题和嵌套列表，使导图可以继续超过六层
+- `list` 模式只解析嵌套 Markdown 列表
+- 为已有 Markdown 笔记提供一键转换按钮/命令，并自动识别结构模式
 - 自动去除节点文本中的行内 Markdown 格式（粗体、斜体、链接、Wiki 链接、行内代码）
 - 当存在多个顶级标题时，会自动创建以文件名命名的虚拟根节点
 - 解析时自动跳过围栏代码块
+
+### 结构模式
+
+| 模式 | 源格式 | 适合场景 |
+| ---- | ------ | -------- |
+| **Heading** | 只使用 Markdown 标题 | 层级较短、希望保留普通文档大纲的导图 |
+| **Hybrid** | 1-6 层标题，更深层使用嵌套列表 | 深层导图，同时保留可读章节结构 |
+| **List** | 只使用嵌套 Markdown 列表 | 手机端快速缩进编辑、移动端友好的大纲 |
+
+选择结果会保存到 frontmatter 的 `mindmap-structure`。如果缺少该字段，插件会扫描正文：标题加列表识别为 `hybrid`，纯列表识别为 `list`，纯标题识别为 `heading`。
+
+### 使用列表表达深层导图
+
+Markdown 只定义了六级标题。对于更深的导图，可以在标题后继续使用嵌套列表：
+
+```markdown
+# Root
+## Branch
+### Level 3
+#### Level 4
+##### Level 5
+###### Level 6
+- Level 7
+  - Level 8
+    - Level 9
+```
+
+画布上的节点编辑仍会写回源笔记。第 1-6 层会保存为标题，更深层级会保存为嵌套列表项。
 
 ### 布局模式
 
@@ -333,6 +441,12 @@ type: mindmap
 | 添加子节点（无需编辑）     | 选中节点后按 **Tab**                    |
 | 删除节点                   | 选中节点后按 **Delete** 或 **Backspace**|
 | 折叠/展开节点              | 选中节点后按 **Space**                  |
+| 回退上一步导图操作         | 选中节点后按 **Mod + Z**                    |
+| 重做刚回退的导图操作       | 选中节点后按 **Mod + Shift + Z** 或 **Mod + Y** |
+| 上下移动同级节点           | 选中节点后按 **Shift + ArrowUp / ArrowDown** |
+| 提升节点层级               | 选中节点后按 **Shift + Tab** 或 **Mod + ArrowLeft** |
+| 降到上一个同级节点下面     | 选中节点后按 **Mod + ArrowRight**       |
+| 拖拽节点                   | 拖到目标节点上；上/下边缘表示前后排序，中间表示作为子节点 |
 | 右键上下文菜单             | 右键点击节点                            |
 
 - 根节点不可删除。
@@ -361,6 +475,7 @@ type: mindmap
 
 | Frontmatter 字段   | 可选值                                                                     |
 | ------------------ | -------------------------------------------------------------------------- |
+| `mindmap-structure`| `heading` / `hybrid` / `list`                                                |
 | `mindmap-layout`   | `balanced` / `right` / `left` / `tree` / `radial`                          |
 | `mindmap-theme`    | `vibrant` / `classic` / `fresh` / `ocean` / `sunset` / `midnight` / `slate`|
 | `mindmap-line`     | `curve` / `straight` / `polyline` / `polyline-dashed` / `curve-dashed`     |
@@ -375,7 +490,7 @@ type: mindmap
 
 ### 链接与双向链接
 
-标题中的 Markdown 链接（`[文本](url)`）和 Wiki 链接（`[[笔记]]`、`[[笔记|别名]]`）会直接在思维导图画布上渲染为可点击的链接。
+标题或列表项中的 Markdown 链接（`[文本](url)`）和 Wiki 链接（`[[笔记]]`、`[[笔记|别名]]`）会直接在思维导图画布上渲染为可点击的链接。
 
 - **外部链接**（`http://...`）在默认浏览器中打开
 - **内部链接**（相对路径如 `./note.md`）在新的 Obsidian 标签页中打开
@@ -406,6 +521,7 @@ type: mindmap
 ```yaml
 ---
 type: mindmap
+mindmap-structure: hybrid
 mindmap-layout: balanced
 mindmap-theme: vibrant
 mindmap-line: curve

@@ -183,8 +183,9 @@
   font-size: 13px;
   line-height: 1.4;
   white-space: nowrap;
-  cursor: default;
+  cursor: grab;
   user-select: none;
+  touch-action: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
   max-width: 320px;
@@ -198,6 +199,65 @@
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
   z-index: 5;
   filter: brightness(1.05);
+}
+
+.lmm-node.lmm-node-root,
+.lmm-node.lmm-node-virtual {
+  cursor: default;
+}
+
+.lmm-overlay.lmm-node-dragging {
+  cursor: grabbing;
+}
+
+.lmm-overlay.lmm-node-dragging .lmm-node:hover {
+  transform: none;
+}
+
+.lmm-node.lmm-drag-source {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: grabbing;
+}
+
+.lmm-node.lmm-drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100000;
+  pointer-events: none;
+  opacity: 0.88;
+  cursor: grabbing;
+  transform: translate3d(0, 0, 0);
+  transition: none;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+}
+
+.lmm-node.lmm-drop-child {
+  outline: 3px solid var(--lmm-theme-root-accent, #6366F1);
+  outline-offset: 5px;
+  z-index: 9;
+}
+
+.lmm-node.lmm-drop-before::before,
+.lmm-node.lmm-drop-after::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lmm-theme-root-accent, #6366F1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lmm-theme-root-accent, #6366F1) 18%, transparent);
+  pointer-events: none;
+}
+
+.lmm-node.lmm-drop-before::before {
+  top: -9px;
+}
+
+.lmm-node.lmm-drop-after::after {
+  bottom: -9px;
 }
 
 .lmm-node:focus {
